@@ -1,0 +1,80 @@
+{
+  "name": "approach_above",
+  "description": "Move the gripper above a target point and point it straight down, aligned with the target's edges.",
+  "roles": [
+    "obj"
+  ],
+  "controllers": [
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "obj",
+      "axis": "x",
+      "param": "o_x",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "obj",
+      "axis": "y",
+      "param": "o_y",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "obj",
+      "axis": "z",
+      "param": "o_z",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "AxisAlign",
+      "source": "eef_z",
+      "target": "obj_normal",
+      "axis": null,
+      "param": "o_theta",
+      "action": null,
+      "priority": 2,
+      "stage": 0
+    }
+  ],
+  "params": [
+    {
+      "name": "o_x",
+      "description": "x offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_y",
+      "description": "y offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_z",
+      "description": "hover height above the grasp point",
+      "unit": "m"
+    },
+    {
+      "name": "o_theta",
+      "description": "angle between gripper axis and surface normal",
+      "unit": "deg"
+    }
+  ],
+  "defaults": {
+    "o_x": 0.0,
+    "o_y": 0.0,
+    "o_z": 0.12,
+    "o_theta": 180.0
+  },
+  "uses": 1,
+  "successes": 1,
+  "created": "2026-09-26 11:00"
+}

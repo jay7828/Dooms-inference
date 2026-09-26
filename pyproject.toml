@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dooms"
+version = "0.1.0"
+description = "Agentic task-axis manipulation: 4 Bedrock agents -> controller skills -> MuJoCo, with a benchmark harness"
+requires-python = ">=3.10"
+dependencies = [
+  "mujoco>=3.2",
+  "numpy",
+  "scipy",
+  "pydantic>=2",
+  "pyyaml",
+  "boto3",
+  "python-dotenv",
+  "opencv-python-headless",
+  "imageio",
+  "imageio-ffmpeg",
+  "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+web = ["fastapi", "uvicorn[standard]"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dooms = ["llm/prompts/*.md", "sim/scenes/assets/**/*", "server/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

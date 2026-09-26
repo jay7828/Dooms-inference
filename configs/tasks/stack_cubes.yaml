@@ -1,0 +1,13 @@
+name: stack_cubes
+instruction: "stack the red cube on top of the blue cube"
+objects:
+  - {name: cube_red, type: cube, x_range: [0.42, 0.56], y_range: [0.10, 0.25], yaw_range: [-0.4, 0.4], color: [0.85, 0.15, 0.15], size: 0.04}
+  - {name: cube_blue, type: cube, x_range: [0.42, 0.56], y_range: [-0.25, -0.10], yaw_range: [-0.4, 0.4], color: [0.15, 0.3, 0.9], size: 0.04}
+keypoints:
+  cube_red_top: "centre of the top face of the red cube"
+  cube_blue_top: "centre of the top face of the blue cube"
+scene_context: >
+  Robot base is at the world origin, x forward, z up, table top at z=0.
+  Both cubes are 0.04 m on each side. The parallel gripper opens to at most 0.08 m.
+success:
+  - {type: on_top, object: cube_red, target: cube_blue}

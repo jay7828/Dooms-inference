@@ -1,0 +1,12 @@
+region: us-east-1            # overridden by AWS_REGION if set
+# Claude Sonnet 4.5 via cross-region inference profile (on-demand needs the profile ID).
+# Use the "global." or "us." prefix depending on what your account has enabled.
+default_model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+agents:
+  task_decomposer:  {model: null, temperature: 0.0, max_tokens: 1500}
+  skill_generator:  {model: null, temperature: 0.0, max_tokens: 4000}
+  parameter_setter: {model: null, temperature: 0.0, max_tokens: 2000}
+  vision_grounder:  {model: null, temperature: 0.0, max_tokens: 1500}
+retry: {max_attempts: 3, base_delay_s: 1.5}
+# USD per 1M tokens, used for the cost metric
+pricing: {input_per_m: 3.0, output_per_m: 15.0}

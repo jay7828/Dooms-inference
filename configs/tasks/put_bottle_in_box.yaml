@@ -1,0 +1,15 @@
+name: put_bottle_in_box
+instruction: "put the bottle into the box"
+objects:
+  - {name: bottle, type: bottle, x_range: [0.42, 0.56], y_range: [0.08, 0.24], color: [0.45, 0.7, 0.95]}
+  - {name: box, type: tray, x_range: [0.40, 0.55], y_range: [-0.30, -0.14], yaw_range: [0.0, 0.0], color: [0.22, 0.22, 0.24]}
+keypoints:
+  bottle_cap: "the top of the bottle's small cap (a top-down grasp point only while the bottle STANDS upright; on a bottle lying on its side this surface faces sideways)"
+  box_inside: "centre of the box's interior floor"
+scene_context: >
+  Robot base is at the world origin, x forward, z up, table top at z=0.
+  The bottle is a water bottle about 0.17 m long and 0.045 m wide, with a narrow cap end about 0.03 m long and 0.024 m wide.
+  The box is an open tray about 0.18 m x 0.18 m with 0.05 m tall walls.
+  The parallel gripper opens to at most 0.08 m.
+success:
+  - {type: inside, object: bottle, target: box}

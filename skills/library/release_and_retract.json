@@ -1,0 +1,40 @@
+{
+  "name": "release_and_retract",
+  "description": "Open the gripper to let go, then move straight up away from the object.",
+  "roles": [],
+  "controllers": [
+    {
+      "type": "Gripper",
+      "source": null,
+      "target": null,
+      "axis": null,
+      "param": null,
+      "action": "open",
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "eef_tcp",
+      "axis": "z",
+      "param": "o_z",
+      "action": null,
+      "priority": 1,
+      "stage": 1
+    }
+  ],
+  "params": [
+    {
+      "name": "o_z",
+      "description": "retract height",
+      "unit": "m"
+    }
+  ],
+  "defaults": {
+    "o_z": 0.15
+  },
+  "uses": 2,
+  "successes": 2,
+  "created": "2026-09-26 11:00"
+}

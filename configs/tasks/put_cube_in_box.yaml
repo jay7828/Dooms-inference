@@ -1,0 +1,14 @@
+name: put_cube_in_box
+instruction: "put the red cube into the box"
+objects:
+  - {name: cube_red, type: cube, x_range: [0.42, 0.56], y_range: [0.08, 0.24], yaw_range: [-0.4, 0.4], color: [0.85, 0.15, 0.15], size: 0.04}
+  - {name: box, type: tray, x_range: [0.40, 0.55], y_range: [-0.30, -0.14], color: [0.22, 0.22, 0.24]}
+keypoints:
+  cube_red_top: "centre of the top face of the red cube"
+  box_inside: "centre of the box's interior floor"
+scene_context: >
+  Robot base is at the world origin, x forward, z up, table top at z=0.
+  The red cube is 0.04 m on each side. The box is an open tray about 0.18 m x 0.18 m with 0.05 m tall walls.
+  The parallel gripper opens to at most 0.08 m.
+success:
+  - {type: inside, object: cube_red, target: box}

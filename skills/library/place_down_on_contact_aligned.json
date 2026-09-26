@@ -1,0 +1,97 @@
+{
+  "name": "place_down_on_contact_aligned",
+  "description": "Lower the held object onto a boxy destination, edges aligned, until contact is felt.",
+  "roles": [
+    "dest",
+    "obj"
+  ],
+  "controllers": [
+    {
+      "type": "PosAlign",
+      "source": "obj",
+      "target": "dest",
+      "axis": "x",
+      "param": "o_x",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "obj",
+      "target": "dest",
+      "axis": "y",
+      "param": "o_y",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "Force",
+      "source": null,
+      "target": null,
+      "axis": "-z",
+      "param": "f",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "AxisAlign",
+      "source": "eef_z",
+      "target": "dest_normal",
+      "axis": null,
+      "param": "o_theta",
+      "action": null,
+      "priority": 2,
+      "stage": 0
+    },
+    {
+      "type": "YawAlign",
+      "source": "eef_y",
+      "target": "dest_axis",
+      "axis": null,
+      "param": "o_yaw",
+      "action": null,
+      "priority": 2,
+      "stage": 0
+    }
+  ],
+  "params": [
+    {
+      "name": "o_x",
+      "description": "x offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_y",
+      "description": "y offset",
+      "unit": "m"
+    },
+    {
+      "name": "f",
+      "description": "contact force",
+      "unit": "N"
+    },
+    {
+      "name": "o_theta",
+      "description": "angle",
+      "unit": "deg"
+    },
+    {
+      "name": "o_yaw",
+      "description": "finger direction vs destination edge",
+      "unit": "deg"
+    }
+  ],
+  "defaults": {
+    "o_x": 0.0,
+    "o_y": 0.0,
+    "f": 2.0,
+    "o_theta": 180.0,
+    "o_yaw": 90.0
+  },
+  "uses": 1,
+  "successes": 1,
+  "created": "2026-09-26 11:00"
+}

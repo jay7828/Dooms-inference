@@ -1,0 +1,21 @@
+name: sandbox_blocked
+instruction: "pick up the bottle and put it on the table"
+objects:
+  - {name: bottle, type: bottle, lying: true, x_range: [0.50, 0.50], y_range: [0.10, 0.10], yaw_range: [1.5708, 1.5708], color: [0.45, 0.7, 0.95]}
+  - {name: box, type: tray, x_range: [0.50, 0.50], y_range: [0.23, 0.23], color: [0.22, 0.22, 0.24]}
+  - {name: cube_red, type: cube, x_range: [0.34, 0.34], y_range: [-0.14, -0.14], color: [0.85, 0.15, 0.15], size: 0.04}
+  - {name: cube_blue, type: cube, x_range: [0.34, 0.34], y_range: [-0.28, -0.28], color: [0.15, 0.3, 0.9], size: 0.04}
+keypoints:
+  bottle_body_center: "the middle of the bottle's body, on its top surface"
+  box_inside: "centre of the box's interior floor"
+  cube_red_top: "centre of the top face of the red cube"
+  cube_blue_top: "centre of the top face of the blue cube"
+scene_context: >
+  Robot base is at the world origin, x forward, z up, table top at z=0.
+  Objects on the table: a water bottle (about 0.17 m long and 0.045 m wide), a red cube and a blue cube (0.04 m on
+  each side), and an open tray called "the box" (about 0.18 m x 0.18 m, 0.05 m tall walls, about 0.65 kg, it slides
+  when pushed). The parallel gripper opens to at most 0.08 m; its fingers need about 6 cm of free space on each
+  side of whatever it grasps. The robot can reach the middle of the table in front of it (x 0.3 to 0.65 m,
+  y -0.35 to 0.35 m).
+min_object_separation: 0.05
+success: []

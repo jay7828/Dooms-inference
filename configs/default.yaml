@@ -1,0 +1,29 @@
+sim:
+  timestep: 0.002
+  control_hz: 50
+  settle_seconds: 0.6
+  cameras:
+    scene: {pos: [0.95, -0.55, 0.80], lookat: [0.45, 0.0, 0.06], fovy: 55, width: 640, height: 480}
+    wrist: {fovy: 75, width: 320, height: 240}
+execution:
+  max_subtask_seconds: 10.0
+  max_lin_speed: 0.30        # m/s
+  max_ang_speed: 1.2         # rad/s
+  pos_gain: 5.0
+  ang_gain: 4.0
+  pos_tol: 0.006             # m
+  ang_tol: 0.05              # rad
+  damping: 0.02
+  force_approach_speed: 0.04 # m/s while searching for contact
+pipeline:
+  grounding: vlm             # vlm | oracle
+  refine_iters: 1            # coarse-to-fine zoom passes for VLM pointing
+  skill_library_dir: null    # e.g. skills/library -> reuse + learn skills across runs (CLI/web set this)
+  wrist_refine: true         # re-ground reach targets from the wrist camera once the gripper hovers above them
+  obstacle_check: true       # measure finger clearance at grasp targets from depth; blocked -> agents decide what to do
+  max_obstacle_rounds: 2
+  max_regrounds: 2           # on failure: go home, look again (vision only) and re-run the SAME plan, before any replan
+  max_subtask_retries: 0     # repeating the same subtask rarely helps; a fresh look (max_regrounds) does
+  max_replans: 1
+  record_video: true
+  video_fps: 20

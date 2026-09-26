@@ -1,0 +1,90 @@
+{
+  "name": "grasp_from_above",
+  "description": "Lower the open gripper onto a target point from above and close the fingers on it.",
+  "roles": [
+    "obj"
+  ],
+  "controllers": [
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "obj",
+      "axis": "x",
+      "param": "o_x",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "obj",
+      "axis": "y",
+      "param": "o_y",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "eef_tcp",
+      "target": "obj",
+      "axis": "z",
+      "param": "o_d",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "AxisAlign",
+      "source": "eef_z",
+      "target": "obj_normal",
+      "axis": null,
+      "param": "o_theta",
+      "action": null,
+      "priority": 2,
+      "stage": 0
+    },
+    {
+      "type": "Gripper",
+      "source": null,
+      "target": null,
+      "axis": null,
+      "param": null,
+      "action": "close",
+      "priority": 1,
+      "stage": 1
+    }
+  ],
+  "params": [
+    {
+      "name": "o_x",
+      "description": "x offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_y",
+      "description": "y offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_d",
+      "description": "signed z offset of the fingertips from the keypoint (negative = below)",
+      "unit": "m"
+    },
+    {
+      "name": "o_theta",
+      "description": "gripper vs normal angle",
+      "unit": "deg"
+    }
+  ],
+  "defaults": {
+    "o_x": 0.0,
+    "o_y": 0.0,
+    "o_d": -0.016,
+    "o_theta": 180.0
+  },
+  "uses": 1,
+  "successes": 1,
+  "created": "2026-09-26 11:00"
+}
