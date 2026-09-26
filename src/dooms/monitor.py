@@ -16,7 +16,8 @@ class Verdict:
 
 
 class Monitor:
-    def __init__(self):
+    def __init__(self, min_grasp_width: float = GRASP_MIN_WIDTH):
+        self.min_grasp_width = min_grasp_width
         self.holding = False
         self.expect_grasp = True      # False in obstacle-clearing plans: the closed gripper is a pusher, not a grasp
 
@@ -30,11 +31,11 @@ class Monitor:
         if "close" in actions and not self.expect_grasp:
             return Verdict(True)
         if "close" in actions:
-            if res.gripper_width < GRASP_MIN_WIDTH:
+            if res.gripper_width < self.min_grasp_width:
                 return Verdict(False, f"grasp missed: gripper closed to {res.gripper_width * 1000:.1f} mm on nothing")
             self.holding = True
         elif "open" in actions:
             self.holding = False
-        elif self.holding and res.gripper_width < GRASP_MIN_WIDTH:
+        elif self.holding and res.gripper_width < self.min_grasp_width:
             return Verdict(False, "the held object was dropped during the motion")
         return Verdict(True)

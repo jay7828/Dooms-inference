@@ -24,6 +24,8 @@ class RobotInterface(ABC):
     """What the runtime needs from any arm: read state, kinematics, and four command kinds."""
 
     n_joints: int
+    max_width: float = 0.08           # widest gripper opening (m)
+    force_sensor: bool = True         # wrist force/torque available
 
     @abstractmethod
     def state(self) -> RobotState: ...

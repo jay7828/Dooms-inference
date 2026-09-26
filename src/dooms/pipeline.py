@@ -74,17 +74,20 @@ class EpisodeResult:
 class Pipeline:
     def __init__(self, env: MuJoCoEnv, llm: LLMClient, cfg: dict, task: TaskSpec, run_dir: Path | None = None,
                  emit=None, library: SkillLibrary | None = None):
+        from .robots import apply_profile
+        cfg = apply_profile(cfg, env.profile)               # this arm's speeds / options
         self.env, self.llm, self.cfg, self.task = env, llm, cfg, task
         self.emit = emit or (lambda e: None)
         self.run_dir = Path(run_dir) if run_dir else None
-        pc, bc = cfg["pipeline"], cfg["bedrock"]
+        pc = cfg["pipeline"]
+        bc = {**cfg["bedrock"], "robot": env.profile.id}    # agents pick the arm's spec / controller notes from this
         self.decomposer = TaskDecomposer(llm, bc)
         self.skillgen = SkillGenerator(llm, bc)
         self.paramset = ParameterSetter(llm, bc)
         self.grounder = (OracleGrounder(env) if pc["grounding"] == "oracle"
                          else VisionGrounder(llm, bc, refine_iters=pc["refine_iters"]))
         self.runtime = Runtime(env, cfg, env.q_home)
-        self.monitor = Monitor()
+        self.monitor = Monitor(env.profile.grasp_min_width)
         self.store = KeypointStore()
         self.res: EpisodeResult | None = None
         self._t_start = 0.0
@@ -345,7 +348,7 @@ class Pipeline:
         try:
             if reset:
                 self.env.reset(seed)
-            elif np.linalg.norm(self.env.state().q - self.env.q_home) > 0.05 or self.env.state().gripper_width < 0.07:
+            elif np.linalg.norm(self.env.state().q - self.env.q_home) > 0.05 or self.env.state().gripper_width < 0.87 * self.env.max_width:
                 self.emit({"type": "status", "text": "returning to the home pose"})
                 self.runtime.go_home()
             self._t_start = self.env.state().t

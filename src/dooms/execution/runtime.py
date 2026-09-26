@@ -43,7 +43,7 @@ class Runtime:
 
     def go_home(self, seconds: float = 2.5) -> None:
         """Recovery motion: open the gripper and return to the home posture (clears the camera's view)."""
-        self.robot.set_gripper(0.08)
+        self.robot.set_gripper(self.robot.max_width)
         q0 = self.robot.state().q.copy()
         n = int(seconds / self.dt)
         for i in range(1, n + 1):

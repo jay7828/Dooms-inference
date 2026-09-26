@@ -10,7 +10,8 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 COPY configs ./configs
 COPY skills ./skills
-RUN pip install --no-cache-dir ".[web]"
+# editable: dooms.ROOT is derived from the package location and must stay /app (configs/, skills/)
+RUN pip install --no-cache-dir -e ".[web]"
 
 # Hosted mode: every user brings their own AWS credentials; the server's are never used.
 ENV DOOMS_REQUIRE_USER_KEYS=1
