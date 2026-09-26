@@ -1,6 +1,7 @@
 // Dooms studio — UI logic. Talks to the server over one WebSocket (events + live poses) and a few REST endpoints.
 import { createViewer } from "/static/viewer.js";
 
+const API = (window.DOOMS_API || "").replace(/\/$/, ""); // "" = same origin; set in config.js when the UI is hosted apart from the backend
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -125,7 +126,7 @@ $("#aws-form").addEventListener("submit", async (e) => {
   const btn = $("#aws-validate"); btn.disabled = true;
   setAwsStatus("busy", "Checking credentials and Claude access…");
   try {
-    const r = await fetch("/api/bedrock/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credentials: creds, model: $("#aws-model").value || null }) });
+    const r = await fetch(API + "/api/bedrock/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credentials: creds, model: $("#aws-model").value || null }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || "Validation failed");
     if (!d.ok) return setAwsStatus("bad", d.message || "Could not connect.");
@@ -175,7 +176,7 @@ $("#opt-toggle").onclick = () => { const o = $("#options"); o.hidden = !o.hidden
 async function loadScene() {
   $("#loading").style.display = "grid";
   try {
-    const sc = await (await fetch(`/api/scene/${S.scene}?seed=${+$("#seed").value || 0}`)).json();
+    const sc = await (await fetch(API + `/api/scene/${S.scene}?seed=${+$("#seed").value || 0}`)).json();
     V.buildScene(sc);
     $("#loading").style.display = "none";
   } catch (e) { $("#loading").textContent = "Could not load the 3D scene."; }
@@ -256,8 +257,8 @@ function renderSkills(list) {
   $("#skills-list").innerHTML = list.length ? list.map((s) => `<details class="skill"><summary><b>${esc(s.name)}</b><span class="st">${s.successes}/${s.uses} ok</span></summary><p>${esc(s.description)}</p><pre class="code">roles: ${esc(s.roles.join(", ") || "—")}\n${s.controllers.map(esc).join("\n")}</pre></details>`).join("")
     : `<div class="empty">No skills yet</div>`;
 }
-async function loadSkills() { try { renderSkills(await (await fetch("/api/skills")).json()); } catch { /* ignore */ } }
-$("#btn-clearskills").onclick = async () => { if (confirm("Delete all stored skills?")) { await fetch("/api/skills", { method: "DELETE" }); loadSkills(); } };
+async function loadSkills() { try { renderSkills(await (await fetch(API + "/api/skills")).json()); } catch { /* ignore */ } }
+$("#btn-clearskills").onclick = async () => { if (confirm("Delete all stored skills?")) { await fetch(API + "/api/skills", { method: "DELETE" }); loadSkills(); } };
 
 /* ------------------------------------------------------------------ event stream */
 function handle(ev) {
@@ -355,7 +356,7 @@ function start() {
 $("#run").onclick = () => (S.running ? S.ws.send(JSON.stringify({ type: "stop" })) : start());
 
 function connect() {
-  const ws = (S.ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"));
+  const ws = (S.ws = new WebSocket((API ? API.replace(/^http/, "ws") : (location.protocol === "https:" ? "wss://" : "ws://") + location.host) + "/ws"));
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
     $("#conn").classList.add("on"); $("#conn").title = "Connected";
@@ -401,7 +402,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && modal.op
 (async function init() {
   S.aws = loadAws();
   buildAgents(); resetRun();
-  S.cfg = await (await fetch("/api/config")).json();
+  S.cfg = await (await fetch(API + "/api/config")).json();
   S.cfg.scenes.forEach((s) => (S.scenes[s.name] = s));
   if (!S.scenes[S.scene]) S.scene = S.cfg.scenes[0].name;
   renderScenes(); fillExamples(true); renderAwsChip(); renderSkills([]);

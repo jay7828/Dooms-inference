@@ -29,6 +29,10 @@ AUTH_TOKEN = os.environ.get("DOOMS_AUTH_TOKEN", "")
 if os.environ.get("DOOMS_EMBEDDED"):
     from fastapi.middleware.cors import CORSMiddleware
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+elif os.environ.get("DOOMS_CORS_ORIGINS"):              # UI hosted elsewhere (e.g. Vercel): comma-separated origins
+    from fastapi.middleware.cors import CORSMiddleware
+    app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in os.environ["DOOMS_CORS_ORIGINS"].split(",") if o.strip()],
+                       allow_methods=["*"], allow_headers=["*"])
 
 
 def _token_ok(given: str | None) -> bool:
