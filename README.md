@@ -119,3 +119,29 @@ Verified in simulation with the scripted stand-in for the LLM (12/12 bottle→bo
 simulated 6 px / 1 px pointing noise). **The live Bedrock path has not been run yet** (no credentials were
 available while building): the request shape is covered by a unit test against a fake client; the prompts and the
 VLM pointing accuracy on real Claude answers are untested.
+
+## Robots
+
+The simulator can drive two arms, chosen in the UI (or `--robot` on `scripts/run_task.py`):
+
+| Robot | Joints | Gripper | Force sensor | Scenes |
+| --- | --- | --- | --- | --- |
+| Franka Panda | 7 | parallel, 8 cm | yes | all |
+| SO-ARM101 | 5 | one moving jaw, 5.5 cm | no | Sandbox, Bottle → box, Cube → box, Stack cubes |
+
+Each arm has a profile in `src/dooms/robots.py` (object scale, workspace, gripper, prompt text). The SO-ARM101 works on a
+smaller table with smaller objects, keeps every height within a few centimetres (its top-down reach ends near 8 cm) and
+lowers objects by height instead of by contact force. Each arm keeps its own skill library (`skills/library` for the Franka,
+`skills/library-<robot>` for the others) because stored parameter defaults only fit the arm that learned them.
+
+## Real robot (SO-101)
+
+The SO-101 can also be driven for real: **Robot: SO101 → Mode: Real robot → Set up**. A five-step wizard connects the arm
+over USB, calibrates it (reference pose, joint directions, range), opens an overview camera (USB webcam or a phone used as
+a webcam) and calibrates it by touching 6 tape marks. Safety layers (joint limits, speed cap, table guard, collision
+detection, temperature and voltage watchdogs, Stop/Esc to hold) are always on. Pick **Virtual SO-101** as the port to try
+every step on a simulated arm that speaks the same servo protocol. Full guide with pictures:
+[docs/real-robot/README.md](docs/real-robot/README.md) (also served in the app at `/static/guide/`).
+
+Code: `src/dooms/hardware/` (Feetech bus protocol, arm driver + calibration, camera + camera calibration, the pipeline's
+real-robot environment, the setup session, and the virtual rig used for testing). Tests: `tests/test_hardware.py`.

@@ -15,18 +15,18 @@ ARM_JOINTS = {"franka": [f"joint{i}" for i in range(1, 8)],
               "so101": ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]}
 GRIPPER_CTRL_MAX = 255.0
 # SO-ARM101 ready pose (pan, lift, elbow, wrist flex, wrist roll): hovers over the workspace, gripper pointing down
-SO101_HOME = np.array([0.0, -0.55, 0.42, 1.55, 0.0])
+SO101_HOME = np.array([0.0, -0.59, 0.45, 1.55, 0.0])
 SO101_FIXED_PAD_X = -0.0115        # inner face of the fixed jaw in the `gripper` body frame (m)
 
 
 class MuJoCoEnv(SimEnv, RobotInterface):
-    def __init__(self, task: TaskSpec, cfg: dict, robot: str | RobotProfile | None = None):
+    def __init__(self, task: TaskSpec, cfg: dict, robot: str | RobotProfile | None = None, extras=None):
         self.profile = robot if isinstance(robot, RobotProfile) else get_profile(robot)
         self.dims = self.profile.dims
         self.max_width = self.profile.max_width
         self.force_sensor = self.profile.force_sensor
         self.task, self.cfg = adapt_task(task, self.profile), cfg
-        self.model = build_spec(self.task, cfg, self.profile).compile()
+        self.model = build_spec(self.task, cfg, self.profile, extras).compile()
         self.data = mujoco.MjData(self.model)
         m = self.model
         so = self.profile.id == "so101"

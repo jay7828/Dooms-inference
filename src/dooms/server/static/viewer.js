@@ -2,7 +2,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-const DEFAULT_VIEW = { pos: [1.62, -1.15, 1.2], target: [0.42, 0.02, 0.1] };
+let DEFAULT_VIEW = { pos: [1.62, -1.15, 1.2], target: [0.42, 0.02, 0.1] };
 
 function b64(s) {
   const bin = atob(s), u8 = new Uint8Array(bin.length);
@@ -119,7 +119,7 @@ export function createViewer(canvas, stage) {
     }
   };
 
-  function labelSprite(text) {
+  function labelSprite(text, k = 1) {
     const c = document.createElement("canvas");
     c.width = 320; c.height = 64;
     const x = c.getContext("2d");
@@ -130,20 +130,20 @@ export function createViewer(canvas, stage) {
     x.strokeStyle = "rgba(124,140,255,.7)"; x.lineWidth = 2; x.stroke();
     x.fillStyle = "#c9d0ff"; x.textAlign = "center"; x.fillText(text, 160, 40);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
-    s.scale.set(0.2, 0.04, 1);
+    s.scale.set(0.2 * k, 0.04 * k, 1);
     return s;
   }
 
   api.showMarkers = (kps) => {
     clearMarkers();
     for (const [name, k] of Object.entries(kps)) {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(0.011, 20, 14), new THREE.MeshBasicMaterial({ color: 0x7c8cff, depthTest: false }));
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.011 * (DEFAULT_VIEW.scale || 1), 20, 14), new THREE.MeshBasicMaterial({ color: 0x7c8cff, depthTest: false }));
       s.position.set(...k.pos); s.renderOrder = 10;
-      const l = labelSprite(name);
-      l.position.set(k.pos[0], k.pos[1], k.pos[2] + 0.06); l.renderOrder = 11;
+      const l = labelSprite(name, DEFAULT_VIEW.scale || 1);
+      l.position.set(k.pos[0], k.pos[1], k.pos[2] + 0.06 * (DEFAULT_VIEW.scale || 1)); l.renderOrder = 11;
       markers.add(s, l);
       if (k.normal) {
-        const a = new THREE.ArrowHelper(new THREE.Vector3(...k.normal), new THREE.Vector3(...k.pos), 0.05, 0x7c8cff, 0.012, 0.008);
+        const a = new THREE.ArrowHelper(new THREE.Vector3(...k.normal), new THREE.Vector3(...k.pos), 0.05 * (DEFAULT_VIEW.scale || 1), 0x7c8cff, 0.012 * (DEFAULT_VIEW.scale || 1), 0.008 * (DEFAULT_VIEW.scale || 1));
         a.line.material.depthTest = false; a.cone.material.depthTest = false;
         markers.add(a);
       }
@@ -151,5 +151,6 @@ export function createViewer(canvas, stage) {
   };
   api.clearMarkers = clearMarkers;
   api.resetView = resetView;
+  api.setDefaultView = (v) => { if (v?.pos && v?.target) { DEFAULT_VIEW = v; resetView(); } else { DEFAULT_VIEW = { pos: [1.62, -1.15, 1.2], target: [0.42, 0.02, 0.1] }; resetView(); } };   // per-robot camera
   return api;
 }

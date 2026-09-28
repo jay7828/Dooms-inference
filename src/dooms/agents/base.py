@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel, ValidationError
 
 from ..llm.base import Block, LLMClient
+from ..robots import get_profile
 
 PROMPT_DIR = Path(__file__).resolve().parents[1] / "llm" / "prompts"
 
@@ -21,9 +22,10 @@ class Agent:
     def __init__(self, llm: LLMClient, bedrock_cfg: dict):
         self.llm = llm
         self.acfg = (bedrock_cfg.get("agents", {}) or {}).get(self.name, {}) or {}
+        self.robot = get_profile(bedrock_cfg.get("robot"))
         self.system = (PROMPT_DIR / f"{self.name}.md").read_text()
         if self.name in ("task_decomposer", "skill_generator", "parameter_setter"):
-            self.system += "\n" + (PROMPT_DIR / "robot_spec.md").read_text()
+            self.system += "\n" + self.robot.spec_text()
         self.trace: list[dict] = []
         self.emit = None    # optional callable(dict) for live UIs
         self.temp_boost = 0.0   # >0 on retries so a deterministic model does not repeat the same wrong answer

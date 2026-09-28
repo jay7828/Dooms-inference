@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 import numpy as np
 
@@ -31,6 +32,10 @@ class CameraParams:
 @dataclass
 class RGBDObservation:
     rgb: np.ndarray    # (H, W, 3) uint8
-    depth: np.ndarray  # (H, W) float32, metres along the camera z axis (0 = no return)
+    depth: np.ndarray | None  # (H, W) float32, metres along the camera z axis (0 = no return); None: RGB-only camera
     camera: CameraParams
     t: float = 0.0     # sim time
+    # RGB-only cameras: height (m) of the surface a named keypoint lies on, used to lift pixels without depth
+    height_of: Callable[[str], float] | None = None
+    # ... and the side length (m) of a square top face there (None: not a boxy object), to recognise that face
+    face_size_of: Callable[[str], float | None] | None = None

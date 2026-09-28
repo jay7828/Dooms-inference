@@ -9,3 +9,5 @@ MUJOCO_LOG.TXT
 node_modules/
 .vercel/
 public/
+.vercel
+.env*

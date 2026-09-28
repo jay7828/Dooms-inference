@@ -51,7 +51,72 @@ def _top_face_axis(obs: RGBDObservation, u: float, v: float, n: np.ndarray, c: n
     return axis / np.linalg.norm(axis), (90.0 if max(l1, l2) / min(l1, l2) < 1.2 else 180.0)
 
 
+def _top_face_axis_rgb(obs: RGBDObservation, u: float, v: float, z: float, size: float | None = None):
+    """Edge direction of a flat top face at height z, from the uniformly coloured image region around (u,v).
+
+    The region is projected onto the face's plane first (so perspective does not distort it), and several colour
+    tolerances are tried: the one whose shape is the most square (and, when known, closest to the expected size) wins.
+    """
+    h, w = obs.rgb.shape[:2]
+    img = np.ascontiguousarray(obs.rgb)
+    best = None
+    for tol in (5, 8, 12, 16, 22):
+        mask = np.zeros((h + 2, w + 2), np.uint8)
+        flags = 8 | cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY | (255 << 8)
+        cv2.floodFill(img, mask, (int(round(u)), int(round(v))), (0, 0, 0), (tol,) * 3, (tol,) * 3, flags)
+        m = mask[1:-1, 1:-1]
+        n = int(m.sum() // 255)
+        if not (20 <= n <= 0.05 * w * h):
+            continue
+        cnts, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        pts = np.concatenate(cnts).reshape(-1, 2).astype(float)
+        world = []
+        for cu, cv_ in pts:
+            o, r = pixel_ray(obs.camera, cu, cv_)
+            if abs(r[2]) < 1e-6:
+                break
+            world.append((o + r * (z - o[2]) / r[2])[:2])
+        if len(world) < 8:
+            continue
+        rect = cv2.minAreaRect(np.asarray(world, np.float32))
+        a_, b_ = rect[1]
+        if min(a_, b_) < 1e-4:
+            continue
+        hull = cv2.convexHull(np.asarray(world, np.float32))
+        fill = cv2.contourArea(hull) / (a_ * b_)
+        aspect = max(a_, b_) / min(a_, b_)
+        if fill < 0.8 or aspect > 1.35:
+            continue
+        cost = (aspect - 1) + (1 - fill)
+        if size:
+            cost += abs(np.sqrt(a_ * b_) / size - 1) * 2
+            if not (0.6 < np.sqrt(a_ * b_) / size < 1.45):
+                continue
+        if best is None or cost < best[0]:
+            best = (cost, rect[2], aspect)
+    if best is None:
+        return None, 180.0
+    ang = np.radians(best[1])
+    return np.array([np.cos(ang), np.sin(ang), 0.0]), 90.0 if best[2] < 1.25 else 180.0
+
+
+def lift_pixel_plane(obs: RGBDObservation, name: str, u: float, v: float) -> Keypoint:
+    """RGB-only camera: intersect the pixel's ray with the horizontal plane the keypoint lies on."""
+    h, w = obs.rgb.shape[:2]
+    u, v = float(np.clip(u, 0, w - 1)), float(np.clip(v, 0, h - 1))
+    z = float(obs.height_of(name)) if obs.height_of else 0.0
+    origin, ray = pixel_ray(obs.camera, u, v)
+    if ray[2] > -1e-3 or (z - origin[2]) / ray[2] <= 0:
+        raise ValueError(f"pixel ({u:.0f},{v:.0f}) does not look down at the table")
+    pos = origin + ray * (z - origin[2]) / ray[2]
+    size = obs.face_size_of(name) if obs.face_size_of else None
+    axis, sym = _top_face_axis_rgb(obs, u, v, z, size) if (size or obs.face_size_of is None) else (None, 180.0)
+    return Keypoint(name, pos, np.array([0.0, 0.0, 1.0]), axis, sym)
+
+
 def lift_pixel(obs: RGBDObservation, name: str, u: float, v: float) -> Keypoint:
+    if obs.depth is None:
+        return lift_pixel_plane(obs, name, u, v)
     h, w = obs.depth.shape
     u, v = float(np.clip(u, 0, w - 1)), float(np.clip(v, 0, h - 1))
     d = depth_at(obs, u, v, win=3, q=20.0)          # foreground-biased depth

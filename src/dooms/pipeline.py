@@ -76,6 +76,8 @@ class Pipeline:
                  emit=None, library: SkillLibrary | None = None):
         from .robots import apply_profile
         cfg = apply_profile(cfg, env.profile)               # this arm's speeds / options
+        if env.task.scene_context != task.scene_context:      # the scene as this arm sees it (scaled objects, its gripper)
+            task = task.model_copy(update={"scene_context": env.task.scene_context})
         self.env, self.llm, self.cfg, self.task = env, llm, cfg, task
         self.emit = emit or (lambda e: None)
         self.run_dir = Path(run_dir) if run_dir else None
@@ -87,7 +89,7 @@ class Pipeline:
         self.grounder = (OracleGrounder(env) if pc["grounding"] == "oracle"
                          else VisionGrounder(llm, bc, refine_iters=pc["refine_iters"]))
         self.runtime = Runtime(env, cfg, env.q_home)
-        self.monitor = Monitor(env.profile.grasp_min_width)
+        self.monitor = Monitor(getattr(env, "grasp_min_width", env.profile.grasp_min_width))
         self.store = KeypointStore()
         self.res: EpisodeResult | None = None
         self._t_start = 0.0
@@ -224,7 +226,7 @@ class Pipeline:
     def _stage_done(self, stage) -> None:
         """Runtime hook: a stage converged -> update what the robot is holding (keypoint tracking)."""
         actions = [c.action for c in stage if c.name == "Gripper"]
-        if "close" in actions and self.env.state().gripper_width >= 0.008:
+        if "close" in actions and self.env.state().gripper_width >= self.monitor.min_grasp_width:
             self.store.on_grasp(list(self.store.kps), self.env.state())
         elif "open" in actions:
             self.store.on_release(self.env.state())
@@ -271,6 +273,8 @@ class Pipeline:
     def _check_obstacles(self, recipes, params) -> str | None:
         """Depth-based clearance check at every grasp target: would a finger hit a neighbouring object?"""
         obs = self.env.render("scene")
+        if obs.depth is None:                                   # RGB-only camera: no height map to check against
+            return None
         for recipe in recipes.recipes:
             if not any(c.type == "Gripper" and c.action == "close" for c in recipe.controllers):
                 continue
@@ -281,7 +285,8 @@ class Pipeline:
                     targets.append(k)
             values = ParameterSetter.values_for(params, recipe.subtask_id)
             for k in targets:
-                res = analyze_reach(obs, self.store.kps[k].pos[:2], self._finger_dir(recipe, values))
+                res = analyze_reach(obs, self.store.kps[k].pos[:2], self._finger_dir(recipe, values),
+                                    finger=self.env.profile.finger)
                 if res.get("blocked"):
                     nearby = {n: kp.pos for n, kp in self.store.kps.items() if n != k}
                     return describe(res, k, nearby)
@@ -352,7 +357,8 @@ class Pipeline:
                 self.emit({"type": "status", "text": "returning to the home pose"})
                 self.runtime.go_home()
             self._t_start = self.env.state().t
-            self._start_pos = {o.name: self.env.object_pos(o.name).copy() for o in self.task.objects}
+            gt = getattr(self.env, "ground_truth_env", self.env)       # real hardware: None (nothing to grade against)
+            self._start_pos = {o.name: gt.object_pos(o.name).copy() for o in self.task.objects} if gt is not None else {}
             self.env.record = bool(pc.get("record_video", False)) and self.run_dir is not None
             self._save("scene.png", self.env.render("scene").rgb)
             failure = None
@@ -407,7 +413,8 @@ class Pipeline:
             if failure is None:
                 res.error = ""
             self.runtime.hold(1.0)
-            ev = evaluate(self.env, self.task, self._start_pos)
+            ev = (evaluate(gt, self.task, self._start_pos) if gt is not None
+                  else {"success": None, "predicates": {}})
             res.verified = ev["success"] is not None
             res.success = ev["success"] if res.verified else (res.error == "")
             res.predicates = ev["predicates"]

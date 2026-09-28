@@ -18,13 +18,13 @@ FINGER_WID = 0.034         # ... and across it
 MIN_HEIGHT = 0.008         # anything taller than this above the table is in the way of the fingertips
 
 
-def _height_map(obs: RGBDObservation, cx: float, cy: float, half: float, res: float):
+def _height_map(obs: RGBDObservation, cx: float, cy: float, half: float, res: float, max_z: float = 0.15):
     h, w = obs.depth.shape
     vs, us = np.mgrid[0:h, 0:w]
     us, vs = us.ravel(), vs.ravel()
     ok = obs.depth[vs, us] > 0
     pts = points_world(obs, us[ok], vs[ok])
-    keep = (np.abs(pts[:, 0] - cx) < half) & (np.abs(pts[:, 1] - cy) < half) & (pts[:, 2] > -0.05) & (pts[:, 2] < 0.15)   # ignore the arm above the workspace
+    keep = (np.abs(pts[:, 0] - cx) < half) & (np.abs(pts[:, 1] - cy) < half) & (pts[:, 2] > -0.05) & (pts[:, 2] < max_z)   # ignore the arm above the workspace
     pts = pts[keep]
     if len(pts) < 200:
         return None
@@ -38,10 +38,13 @@ def _height_map(obs: RGBDObservation, cx: float, cy: float, half: float, res: fl
     return hm, z_table
 
 
-def analyze_reach(obs: RGBDObservation, target_xy, finger_dir, half: float = 0.30, res: float = 0.005) -> dict:
+def analyze_reach(obs: RGBDObservation, target_xy, finger_dir, half: float = 0.30, res: float = 0.005,
+                  finger: dict | None = None) -> dict:
     """finger_dir: horizontal unit vector (x, y) along which the fingers open."""
     tx, ty = float(target_xy[0]), float(target_xy[1])
-    built = _height_map(obs, tx, ty, half, res)
+    f = finger or {}
+    FINGER_CENTER, FINGER_LEN, FINGER_WID = f.get("center", 0.052), f.get("length", 0.030), f.get("width", 0.034)
+    built = _height_map(obs, tx, ty, half, res, f.get("max_z", 0.15))
     if built is None:
         return {"analyzable": False}
     hm, z_table = built

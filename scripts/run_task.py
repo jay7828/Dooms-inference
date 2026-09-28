@@ -9,6 +9,7 @@ from dooms.bench.ablations import ABLATIONS
 from dooms.config import deep_update, load_config
 from dooms.llm.factory import make_llm
 from dooms.pipeline import Pipeline
+from dooms.robots import PROFILES
 from dooms.sim.mujoco_env import MuJoCoEnv
 from dooms.task import list_tasks, load_task
 
@@ -17,6 +18,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", default="put_bottle_in_box", choices=list_tasks())
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--robot", default="franka", choices=sorted(PROFILES), help="arm to simulate")
     ap.add_argument("--llm", default="bedrock", choices=["bedrock", "scripted"])
     ap.add_argument("--model", default=None, help="Bedrock model / inference-profile ID (default: configs/bedrock.yaml)")
     ap.add_argument("--variant", default="baseline", choices=sorted(ABLATIONS))
@@ -26,11 +28,12 @@ def main():
     a = ap.parse_args()
 
     cfg = deep_update(load_config(), ABLATIONS[a.variant])
-    cfg = deep_update(cfg, {"pipeline": {"skill_library_dir": None if a.skills == "none" else a.skills}})
+    lib = None if a.skills == "none" else (a.skills if a.robot == "franka" else f"{a.skills}-{a.robot}")   # one library per arm
+    cfg = deep_update(cfg, {"pipeline": {"skill_library_dir": lib}})
     task = load_task(a.task)
-    env = MuJoCoEnv(task, cfg)
+    env = MuJoCoEnv(task, cfg, a.robot)
     llm = make_llm(a.llm, cfg, task, env, a.model, tuple(a.noise), a.seed)
-    out = Path(a.out) if a.out else ROOT / "runs" / f"{a.task}_{a.llm}_{a.variant}_{a.seed}"
+    out = Path(a.out) if a.out else ROOT / "runs" / f"{a.task}_{a.llm}_{a.variant}_{a.seed}" + ("" if a.robot == "franka" else f"_{a.robot}")
     res = Pipeline(env, llm, cfg, task, run_dir=out).run(a.seed)
     for l in res.subtask_log:
         print(f"  [{l['plan']}] {l['subtask']}. {l['name']:<34} {'ok ' if l['ok'] else 'FAIL'} {l['sim_s']:>5}s  {l['verdict']}")

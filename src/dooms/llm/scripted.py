@@ -9,6 +9,7 @@ import re
 import numpy as np
 
 from ..controllers.library import referenced_keypoints
+from ..robots import FRANKA, RobotProfile
 from ..task import TaskSpec
 from .base import CallRecord, MockLLM
 from .schemas import (SkillChoice, SkillPlan, ControllerSpec, Decomposition, KeypointRequest, ParamSpec, ParameterGroundings, ParamValue,
@@ -31,8 +32,32 @@ def _keypoint_for(task: TaskSpec, obj: str) -> str:
     raise KeyError(obj)
 
 
-def reference_plan(task: TaskSpec, pair: tuple[str, str] | None = None, lying: bool = False):
+def script_numbers(profile: RobotProfile, obj: str, dest: str, lying: bool) -> dict:
+    """Heights / offsets (m) of the reference plan for this arm. Franka values are the tuned originals; the SO-ARM101
+    works a few centimetres above the table (its top-down reach ends near 0.08 m) so everything is small."""
+    is_cube = obj.startswith("cube")
+    if profile.id == "franka":
+        return {"hover": 0.12, "grasp": -0.014 if is_cube else (-0.02 if lying else -0.016),
+                "lift": 0.15 if (is_cube or lying) else 0.20,
+                "hover_dest": 0.16 if lying else ((0.20 if dest == "box" else 0.12) if is_cube else (0.30 if dest != "table" else 0.26)),
+                "place_force": 2.0, "place_z": None, "retract": 0.15}
+    D = profile.dims
+    height = D.cube if is_cube else D.bottle_len                    # held keypoint sits on the object's top
+    wall = 2 * D.tray_wall_half_h                                   # wall height above the tray floor top
+    clear = 0.005
+    hover_dest = {"box": height + wall + clear, "table": height + 0.012}.get(dest, D.cube + 0.012)
+    return {"hover": 0.03, "grasp": -0.007 if is_cube else -0.012, "lift": 0.03, "hover_dest": hover_dest,
+            "place_force": None, "place_z": height + 0.004, "retract": 0.04}
+
+
+def reference_plan(task: TaskSpec, pair: tuple[str, str] | None = None, lying: bool = False,
+                   profile: RobotProfile = FRANKA):
     obj, dest = pair or (task.success[0].object, task.success[0].target)
+    num = script_numbers(profile, obj, dest, lying and obj == "bottle")
+    force = profile.force_sensor
+    # Franka: align with the grounded surface normal (tuned). Other arms: the exact world up vector, because the
+    # measured normal of a small top face (a 1.4 cm cap) is several degrees off and the gripper would chase it.
+    NRM = (lambda k: f"{k}_normal") if profile.id == "franka" else (lambda k: "world_z")
     lying = lying and obj == "bottle"
     K = f"{obj}_body_center" if lying else _keypoint_for(task, obj)
     KE = f"{obj}_cap_end"
@@ -62,7 +87,7 @@ def reference_plan(task: TaskSpec, pair: tuple[str, str] | None = None, lying: b
     dest_cube = D.startswith("cube")
     dyaw = ([C(type="YawAlign", source="eef_y", target=f"{D}_axis", param="o_yaw", priority=2)] if dest_cube else [])
     dyp = [P("o_yaw", "finger direction vs destination edge", "deg")] if dest_cube else []
-    down_d = C(type="AxisAlign", source="eef_z", target=f"{D}_normal", param="o_theta", priority=2)
+    down_d = C(type="AxisAlign", source="eef_z", target=NRM(D), param="o_theta", priority=2)
     yaw = ([C(type="YawAlign", source="eef_y", target=yaw_target, param="o_yaw", priority=2)] if grasp_yaw else [])
     yp = [P("o_yaw", "finger direction vs object edge / long axis", "deg")] if grasp_yaw else []
     recipes = [
@@ -70,39 +95,41 @@ def reference_plan(task: TaskSpec, pair: tuple[str, str] | None = None, lying: b
                                                       P("o_z", "hover height above the grasp point", "m"),
                                                       P("o_theta", "angle between gripper axis and surface normal", "deg")] + yp,
                     controllers=xyz(1, "eef_tcp", K, {"x": "o_x", "y": "o_y", "z": "o_z"}) +
-                                [C(type="AxisAlign", source="eef_z", target=f"{K}_normal", param="o_theta", priority=2)] + yaw),
+                                [C(type="AxisAlign", source="eef_z", target=NRM(K), param="o_theta", priority=2)] + yaw),
         SkillRecipe(subtask_id=2, keypoints=[], params=[P("o_x", "x offset", "m"), P("o_y", "y offset", "m"),
                                                       P("o_d", "signed z offset of the fingertips from the keypoint (negative = below)", "m"),
                                                       P("o_theta", "gripper vs normal angle", "deg")] + yp,
                     controllers=xyz(2, "eef_tcp", K, {"x": "o_x", "y": "o_y", "z": "o_d"}) +
-                                [C(type="AxisAlign", source="eef_z", target=f"{K}_normal", param="o_theta", priority=2)] + yaw +
+                                [C(type="AxisAlign", source="eef_z", target=NRM(K), param="o_theta", priority=2)] + yaw +
                                 [C(type="Gripper", action="close", stage=1)]),
         SkillRecipe(subtask_id=3, keypoints=[], params=[P("o_x", "x offset", "m"), P("o_y", "y offset", "m"),
                                                       P("o_z", "lift height", "m"), P("o_theta", "angle", "deg")],
                     controllers=xyz(3, K, K, {"x": "o_x", "y": "o_y", "z": "o_z"}) +
-                                [C(type="AxisAlign", source="eef_z", target=f"{K}_normal", param="o_theta", priority=2)]),
+                                [C(type="AxisAlign", source="eef_z", target=NRM(K), param="o_theta", priority=2)]),
         SkillRecipe(subtask_id=4, keypoints=[], params=[P("o_x", "x offset", "m"), P("o_y", "y offset", "m"),
                                                       P("o_z", "hover height of the held keypoint over the destination", "m"),
                                                       P("o_theta", "angle", "deg")] + dyp,
                     controllers=xyz(4, K, D, {"x": "o_x", "y": "o_y", "z": "o_z"}) + [down_d] + dyaw),
-        SkillRecipe(subtask_id=5, keypoints=[], params=[P("o_x", "x offset", "m"), P("o_y", "y offset", "m"),
-                                                      P("f", "contact force", "N"), P("o_theta", "angle", "deg")] + dyp,
-                    controllers=xyz(5, K, D, {"x": "o_x", "y": "o_y"}) + [C(type="Force", axis="-z", param="f"), down_d] + dyaw),
+        (SkillRecipe(subtask_id=5, keypoints=[], params=[P("o_x", "x offset", "m"), P("o_y", "y offset", "m"),
+                                                       P("f", "contact force", "N"), P("o_theta", "angle", "deg")] + dyp,
+                     controllers=xyz(5, K, D, {"x": "o_x", "y": "o_y"}) + [C(type="Force", axis="-z", param="f"), down_d] + dyaw)
+         if force else
+         SkillRecipe(subtask_id=5, keypoints=[], params=[P("o_x", "x offset", "m"), P("o_y", "y offset", "m"),
+                                                       P("o_z", "height of the held keypoint above the destination surface", "m"),
+                                                       P("o_theta", "angle", "deg")] + dyp,
+                     controllers=xyz(5, K, D, {"x": "o_x", "y": "o_y", "z": "o_z"}) + [down_d] + dyaw)),
         SkillRecipe(subtask_id=6, keypoints=[], params=[P("o_z", "retract height", "m")],
                     controllers=[C(type="Gripper", action="open", stage=0),
                                  C(type="PosAlign", source="eef_tcp", target="eef_tcp", axis="z", param="o_z", stage=1)]),
     ]
-    grasp = -0.014 if is_cube else (-0.02 if lying else -0.016)
-    hover_dest = (0.20 if dest == "box" else 0.12) if is_cube else (0.30 if dest != "table" else 0.26)
-    if lying:
-        hover_dest = 0.16
     values = {
-        1: {"o_x": 0, "o_y": 0, "o_z": 0.12, "o_theta": 180, **({"o_yaw": 90} if grasp_yaw else {})},
-        2: {"o_x": 0, "o_y": 0, "o_d": grasp, "o_theta": 180, **({"o_yaw": 90} if grasp_yaw else {})},
-        3: {"o_x": 0, "o_y": 0, "o_z": 0.15 if (is_cube or lying) else 0.20, "o_theta": 180},
-        4: {"o_x": 0, "o_y": 0, "o_z": hover_dest, "o_theta": 180, **({"o_yaw": 90} if dest_cube else {})},
-        5: {"o_x": 0, "o_y": 0, "f": 2.0, "o_theta": 180, **({"o_yaw": 90} if dest_cube else {})},
-        6: {"o_z": 0.15},
+        1: {"o_x": 0, "o_y": 0, "o_z": num["hover"], "o_theta": 180, **({"o_yaw": 90} if grasp_yaw else {})},
+        2: {"o_x": 0, "o_y": 0, "o_d": num["grasp"], "o_theta": 180, **({"o_yaw": 90} if grasp_yaw else {})},
+        3: {"o_x": 0, "o_y": 0, "o_z": num["lift"], "o_theta": 180},
+        4: {"o_x": 0, "o_y": 0, "o_z": num["hover_dest"], "o_theta": 180, **({"o_yaw": 90} if dest_cube else {})},
+        5: {"o_x": 0, "o_y": 0, **({"f": num["place_force"]} if force else {"o_z": num["place_z"]}),
+            "o_theta": 180, **({"o_yaw": 90} if dest_cube else {})},
+        6: {"o_z": num["retract"]},
     }
     params = ParameterGroundings(values=[ParamValue(subtask_id=s, name=n, value=float(v), rationale="reference")
                                          for s, d in values.items() for n, v in d.items()])
@@ -249,12 +276,14 @@ SKILL_DESC = {
     "grasp_from_above_aligned": "Lower onto a boxy target from above with the fingers aligned to its faces and close the gripper.",
     "move_over_aligned": "Carry the held object over a boxy destination and hover above it, edges aligned.",
     "place_down_on_contact_aligned": "Lower the held object onto a boxy destination, edges aligned, until contact is felt.",
+    "place_down_to_height": "Lower the held object over the destination to a set height above its surface (no force sensing).",
+    "place_down_to_height_aligned": "Lower the held object onto a boxy destination, edges aligned, to a set height above its surface.",
     "approach_above_long_axis": "Move the gripper above a lying elongated object with the fingers turned across its long axis.",
     "grasp_from_above_long_axis": "Lower onto a lying elongated object from above across its width and close the fingers.",
 }
 
 
-def to_plan(rec, task, pair, lying, library_names) -> SkillPlan:
+def to_plan(rec, task, pair, lying, library_names, force: bool = True) -> SkillPlan:
     """Express the reference recipes as skill choices: reuse a stored skill when its name is in the library."""
     obj, dest = pair or (task.success[0].object, task.success[0].target)
     K = f"{obj}_body_center" if (lying and obj == "bottle") else _keypoint_for(task, obj)
@@ -263,7 +292,8 @@ def to_plan(rec, task, pair, lying, library_names) -> SkillPlan:
     choices = []
     for r in rec.recipes:
         aligned = any(c.type == "YawAlign" for c in r.controllers)
-        name = SKILL_NAMES[r.subtask_id] + ("_long_axis" if lying and r.subtask_id in (1, 2) else "_aligned" if aligned else "")
+        base_name = SKILL_NAMES[r.subtask_id] if (force or r.subtask_id != 5) else "place_down_to_height"
+        name = base_name + ("_long_axis" if lying and r.subtask_id in (1, 2) else "_aligned" if aligned else "")
         refs = referenced_keypoints(r.controllers)
         bindings = {role: kp for role, kp in roles.items() if kp in refs}
         defined = [k for k in r.keypoints if k.name in DEFINED]
@@ -298,7 +328,7 @@ class ScriptedLLM(MockLLM):
             if self._plans is None:
                 lying = bool(self.env is not None and any(o.type == "bottle" and o.lying for o in task.objects)
                              and self.env.bottle_lying())
-                dec, rec, par = reference_plan(task, pair, lying)
+                dec, rec, par = reference_plan(task, pair, lying, self.env.profile if self.env is not None else FRANKA)
                 self._plans = ((dec, rec, par), merge_plan(dec, rec, par), lying)
             return self._plans
 
@@ -309,7 +339,7 @@ class ScriptedLLM(MockLLM):
             if single(c[0]):
                 return merged_to_plan(p[1][1])
             names = set(re.findall(r"^- (\w+)\(roles:", c[0], flags=re.M))
-            return to_plan(p[0][1], task, pair, p[2], names)
+            return to_plan(p[0][1], task, pair, p[2], names, self.env is None or self.env.profile.force_sensor)
 
         self._mode = "task"
         self._clear = None
@@ -332,8 +362,12 @@ class ScriptedLLM(MockLLM):
                           "parameter_setter": parameters,
                           "vision_grounder": self._ground})
 
+    # Which simulator camera stands behind an image the pipeline shows the "VLM" (the virtual hardware rig maps its
+    # overview camera to the rig's tripod camera, so the demo planner points like a person looking at the real feed).
+    cam_alias: dict[str, str] = {}
+
     def _project(self, name: str, cam_name: str = "scene"):
-        obs = self.env.render(cam_name)
+        obs = self.env.render(self.cam_alias.get(cam_name, cam_name))
         p, _ = self.env.visible_keypoint(name)
         cam = obs.camera
         pc = np.linalg.inv(cam.T_world_cam) @ np.append(p, 1.0)

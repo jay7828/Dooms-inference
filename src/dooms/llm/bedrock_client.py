@@ -53,6 +53,8 @@ def _session(creds: dict | None, default_region: str):
 
 
 class BedrockClient:
+    remote = True        # network calls: the session worker runs them on a helper thread so Stop can interrupt them
+
     def __init__(self, bedrock_cfg: dict, model_override: str | None = None, credentials: dict | None = None):
         self.cfg = bedrock_cfg
         self.default_model = model_override or bedrock_cfg["default_model"]

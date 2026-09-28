@@ -1,6 +1,7 @@
 """Runtime: evaluates the compiled controllers every tick and drives the robot interface."""
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -10,6 +11,10 @@ from ..controllers.base import Context, Keypoint, TaskTerm
 from ..controllers.stack import solve_stack
 from ..sim.base import RobotInterface
 from .compiler import SubtaskScript
+
+
+STALL_SECONDS = 2.0      # a stage that has not moved (position or orientation) for this long is stuck
+STALL_MOVE = 0.003       # ... 'moved' meaning more than 3 mm of end-effector pose change
 
 
 @dataclass
@@ -43,6 +48,7 @@ class Runtime:
 
     def go_home(self, seconds: float = 2.5) -> None:
         """Recovery motion: open the gripper and return to the home posture (clears the camera's view)."""
+        self._lift_clear()
         self.robot.set_gripper(self.robot.max_width)
         q0 = self.robot.state().q.copy()
         n = int(seconds / self.dt)
@@ -52,6 +58,24 @@ class Runtime:
             self.robot.step()
         self._q_des = None
         self.hold(0.3)
+
+    def _lift_clear(self, below: float = 0.06, by: float = 0.04, seconds: float = 1.5) -> None:
+        """A gripper resting low (on the table, beside an object) first rises straight up: swinging home through
+        joint space from there can sweep it through the table or the objects."""
+        s = self.robot.state()
+        if s.tcp_pos[2] >= below:
+            return
+        from ..controllers.pos_align import PosAlign
+        from .compiler import SubtaskScript
+        ctl = PosAlign("eef_tcp", "eef_tcp", "z", by, 1, 0)
+        cfg = {**self.cfg, "execution": {**self.cfg["execution"], "max_subtask_seconds": seconds}}
+        saved, self.cfg = self.cfg, cfg
+        try:
+            self.run_subtask(SubtaskScript(0, "lift clear", [[ctl]], {}), {})
+        except Exception:  # noqa: BLE001  (best effort: the joint-space move follows anyway)
+            pass
+        finally:
+            self.cfg = saved
 
     def _servo(self, levels: list) -> None:
         s = self.robot.state()
@@ -82,13 +106,25 @@ class Runtime:
             if grip:
                 self.robot.set_gripper(grip[-1])
             ok_ticks, ts = 0, 0.0
+            window = deque(maxlen=int(STALL_SECONDS / self.dt))       # recent end-effector pose, to notice "stuck"
             s0 = self.robot.state()
             p_hold, R_hold = s0.tcp_pos.copy(), s0.tcp_rot.copy()
             while True:
                 s = self.robot.state()
                 if s.t - t0 > c["max_subtask_seconds"]:
-                    return SubtaskResult(script.subtask_id, script.name, False, "timeout",
+                    tctx = Context(self.robot, s, keypoints, self.cfg, ts, self.dt)
+                    stuck = [ctl.describe() for ctl in stage if not ctl.finished(tctx)]
+                    why = "timeout" + (f" (not converged: {'; '.join(stuck)})" if stuck else "")
+                    return SubtaskResult(script.subtask_id, script.name, False, why,
                                          s.t - t0, stages_done, s.gripper_width)
+                window.append(np.concatenate([s.tcp_pos, 0.1 * s.tcp_rot.ravel()]))     # 1 rad of rotation ~ 0.1 m
+                if len(window) == window.maxlen and ts > STALL_SECONDS + 0.5:
+                    tctx = Context(self.robot, s, keypoints, self.cfg, ts, self.dt)
+                    stuck = [ctl.describe() for ctl in stage if not ctl.finished(tctx)]
+                    if stuck and float(np.ptp(np.array(window), axis=0).max()) < STALL_MOVE:
+                        why = ("stalled: no progress for 2 s, the target is probably out of reach or blocked "
+                               f"(not converged: {'; '.join(stuck)})")
+                        return SubtaskResult(script.subtask_id, script.name, False, why, s.t - t0, stages_done, s.gripper_width)
                 ctx = Context(self.robot, s, keypoints, self.cfg, ts, self.dt)
                 terms = [(ctl.priority, ctl.term(ctx)) for ctl in stage]
                 levels = [lv for lv in ([t for p, t in terms if p == pr and t is not None]

@@ -1,0 +1,81 @@
+{
+  "name": "place_down_to_height",
+  "description": "Lower the held object over the destination to a set height above its surface (no force sensing).",
+  "roles": [
+    "dest",
+    "obj"
+  ],
+  "controllers": [
+    {
+      "type": "PosAlign",
+      "source": "obj",
+      "target": "dest",
+      "axis": "x",
+      "param": "o_x",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "obj",
+      "target": "dest",
+      "axis": "y",
+      "param": "o_y",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "PosAlign",
+      "source": "obj",
+      "target": "dest",
+      "axis": "z",
+      "param": "o_z",
+      "action": null,
+      "priority": 1,
+      "stage": 0
+    },
+    {
+      "type": "AxisAlign",
+      "source": "eef_z",
+      "target": "world_z",
+      "axis": null,
+      "param": "o_theta",
+      "action": null,
+      "priority": 2,
+      "stage": 0
+    }
+  ],
+  "params": [
+    {
+      "name": "o_x",
+      "description": "x offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_y",
+      "description": "y offset",
+      "unit": "m"
+    },
+    {
+      "name": "o_z",
+      "description": "height of the held keypoint above the destination surface",
+      "unit": "m"
+    },
+    {
+      "name": "o_theta",
+      "description": "angle",
+      "unit": "deg"
+    }
+  ],
+  "defaults": {
+    "o_x": 0.0,
+    "o_y": 0.0,
+    "o_z": 0.029,
+    "o_theta": 180.0
+  },
+  "uses": 2,
+  "successes": 2,
+  "created": "2026-09-28 09:57"
+}

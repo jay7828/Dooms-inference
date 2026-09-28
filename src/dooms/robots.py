@@ -53,6 +53,7 @@ class RobotProfile:
     # task object placement is authored for the Franka (base at the origin, workspace x 0.32-0.58, y +-0.3);
     # other arms remap it: x' = x0 + (x - 0.45) * kx, y' = y * ky
     remap: tuple[float, float, float] | None = None
+    max_radius: float | None = None      # objects are kept within this distance of the base (reach limit at working height)
     min_separation: float | None = None
     scene_cam: dict = field(default_factory=dict)
     view: dict = field(default_factory=dict)         # default 3D viewer camera {pos, target}
@@ -80,7 +81,7 @@ FRANKA = RobotProfile(
     table_center=(0.45, 0.0), table_half=(0.6, 0.65),
     scene_cam={"pos": [0.95, -0.55, 0.80], "lookat": [0.45, 0.0, 0.06], "fovy": 55},
     view={"pos": [1.62, -1.15, 1.2], "target": [0.42, 0.02, 0.1]},
-    finger={"center": 0.052, "length": 0.030, "width": 0.034},
+    finger={"center": 0.052, "length": 0.030, "width": 0.034, "max_z": 0.15},
 )
 
 # SO-ARM101 (Robot Studio / LeRobot): 5 joints + one moving jaw, position-controlled servos, no force sensing.
@@ -92,11 +93,11 @@ SO101 = RobotProfile(
               tray_half=0.055, tray_floor=0.006, tray_wall_t=0.005, tray_wall_half_h=0.009, cube=0.025),
     scenes=("sandbox", "put_bottle_in_box", "put_cube_in_box", "stack_cubes"),
     table_center=(0.2, 0.0), table_half=(0.42, 0.42),
-    remap=(0.20, 0.55, 0.6), min_separation=0.075,
+    remap=(0.205, 0.5, 0.5), max_radius=0.27, min_separation=0.092,
     scene_cam={"pos": [0.48, -0.36, 0.34], "lookat": [0.17, 0.0, 0.01], "fovy": 55},
-    view={"pos": [0.55, -0.42, 0.34], "target": [0.16, 0.0, 0.02]},
-    finger={"center": 0.030, "length": 0.020, "width": 0.020},
-    exec={"max_lin_speed": 0.12, "max_ang_speed": 1.0, "pos_tol": 0.004, "force_approach_speed": 0.02},
+    view={"pos": [0.72, -0.58, 0.46], "target": [0.15, 0.0, 0.03], "scale": 0.45},
+    finger={"center": 0.030, "length": 0.020, "width": 0.020, "max_z": 0.06},
+    exec={"max_lin_speed": 0.12, "max_ang_speed": 1.0, "pos_tol": 0.0025, "force_approach_speed": 0.02},
     pipeline={"wrist_refine": False},
     spec_file="robot_spec_so101.md",
 )
@@ -121,7 +122,14 @@ def adapt_task(task, profile: RobotProfile):
     d = profile.dims
     objs = []
     for o in task.objects:
-        up = {"x_range": tuple(x0 + (v - 0.45) * kx for v in o.x_range), "y_range": tuple(v * ky for v in o.y_range)}
+        xr = tuple(x0 + (v - 0.45) * kx for v in o.x_range)
+        yr = tuple(v * ky for v in o.y_range)
+        if profile.max_radius:                       # cap how far out an object can be placed (arm reach at working height)
+            ymax = max(abs(v) for v in yr)
+            x_hi = float(np.sqrt(max(profile.max_radius ** 2 - ymax ** 2, 0.0)))
+            if xr[1] > x_hi:
+                xr = (min(xr[0], x_hi), x_hi)
+        up = {"x_range": xr, "y_range": yr}
         if o.type == "cube":
             up["size"] = d.cube
         objs.append(o.model_copy(update=up))

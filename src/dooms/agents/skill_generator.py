@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from ..controllers.library import CONTROLLER_LIBRARY_DOC, keypoints_in, referenced_keypoints
+from ..controllers.library import controller_doc, keypoints_in, referenced_keypoints
 from ..llm.schemas import Decomposition, KeypointRequest, ParamSpec, SkillPlan, SkillRecipe, SkillRecipes
 from ..skills import NAME_RE, SkillLibrary, instantiate
 from .base import Agent
@@ -25,16 +25,17 @@ class SkillGenerator(Agent):
         text = (f"Instruction: {instruction}\n\nSubtasks:\n{st}\n\nScene keypoint vocabulary "
                 f"(known keypoints you can use directly; each also has a <name>_normal surface-normal vector). You may also "
                 f"DEFINE new keypoints for places/things not listed:\n{kp}\n\n{lib_text}\n\n"
-                f"{CONTROLLER_LIBRARY_DOC}")
+                f"{controller_doc(self.robot.max_width, self.robot.force_sensor)}")
         if failure_context:
             text += f"\nFAILURE CONTEXT: {failure_context}\n"
-        plan = self.call([text], validate=lambda p: self.assemble(p, subtasks, vocab, library) and None, label="recipes",
-                         attempts=3)
-        return self.assemble(plan, subtasks, vocab, library)
+        force = self.robot.force_sensor
+        plan = self.call([text], validate=lambda p: self.assemble(p, subtasks, vocab, library, force) and None,
+                         label="recipes", attempts=3)
+        return self.assemble(plan, subtasks, vocab, library, force)
 
     @classmethod
     def assemble(cls, plan: SkillPlan, subtasks: Decomposition, vocab: dict[str, str],
-                 library: SkillLibrary | None) -> tuple[SkillRecipes, list[dict]]:
+                 library: SkillLibrary | None, allow_force: bool = True) -> tuple[SkillRecipes, list[dict]]:
         """Turn the agent's choices into concrete recipes (instantiating stored skills), validating everything."""
         if [c.subtask_id for c in plan.choices] != [s.id for s in subtasks.subtasks]:
             raise ValueError("need exactly one choice per subtask, in order, with matching subtask_id")
@@ -74,7 +75,7 @@ class SkillGenerator(Agent):
             infos.append({"subtask_id": sid, "skill_name": ch.skill_name, "reused": ch.recipe is None,
                           "role_bindings": dict(ch.role_bindings), "description": ch.description})
         out = SkillRecipes(recipes=recipes)
-        cls._check(out, subtasks, vocab)
+        cls._check(out, subtasks, vocab, allow_force)
         for info, rec in zip(infos, out.recipes):
             info["recipe"] = rec.model_copy(deep=True)
         return out, infos
@@ -82,7 +83,7 @@ class SkillGenerator(Agent):
     NAME_RE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
 
     @classmethod
-    def _check(cls, r: SkillRecipes, subtasks: Decomposition, vocab: dict[str, str]):
+    def _check(cls, r: SkillRecipes, subtasks: Decomposition, vocab: dict[str, str], allow_force: bool = True):
         if [x.subtask_id for x in r.recipes] != [s.id for s in subtasks.subtasks]:
             raise ValueError("need exactly one recipe per subtask, in order, with matching subtask_id")
         for rec in r.recipes:
@@ -95,6 +96,10 @@ class SkillGenerator(Agent):
                     raise ValueError(f"subtask {rec.subtask_id}: new keypoint '{name}' needs a precise description "
                                      "of what the vision system should point at")
             for c in rec.controllers:
+                if c.type == "Force" and not allow_force:
+                    raise ValueError(f"subtask {rec.subtask_id}: this robot has NO force sensor, so the Force controller is not "
+                                     "available. Lower onto the surface with PosAlign and a small z offset instead "
+                                     "(e.g. hold the object's keypoint at its own height + 0.003 m above the surface).")
                 if c.type in ("PosAlign", "AxisAlign", "YawAlign") and not (c.source and c.target):
                     raise ValueError(f"subtask {rec.subtask_id}: {c.type} needs source and target")
                 if c.type == "PosAlign" and (c.axis or "z") not in ("x", "y", "z"):

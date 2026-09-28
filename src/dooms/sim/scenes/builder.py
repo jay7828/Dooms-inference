@@ -22,10 +22,12 @@ CAP_TOP_Z, TRAY_FLOOR_TOP, TRAY_HALF = _D.cap_top_z, _D.tray_floor, _D.tray_half
 TRAY_WALL_T, TRAY_WALL_HALF_H = _D.tray_wall_t, _D.tray_wall_half_h
 TCP_OFFSET = 0.1025                                  # Franka hand z -> pad centre
 
-# SO-ARM101 TCP in the `gripper` body frame: between the jaws, ~1 cm above the fingertips. The approach
+# SO-ARM101 TCP in the `gripper` body frame: ~1 cm above the fingertips and 1.9 cm from the fixed jaw's innermost point
+# (its tip, at x = -0.008) toward the moving jaw: a 2.5 cm object centred on it clears the fixed jaw by ~7 mm, which
+# absorbs real-world pointing and calibration error (the moving jaw then pushes the object that far toward the fixed one). The approach
 # direction is -z of that frame and the jaw opens along +x (moving jaw), so the controllers' TCP frame is
 # z = approach, y = opening direction, x = y cross z.
-SO101_TCP_POS = (0.0, 0.0, -0.088)
+SO101_TCP_POS = (0.011, 0.0, -0.088)
 SO101_TCP_AXES = np.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]]).T     # columns: tcp x, y, z in gripper frame
 
 
@@ -33,7 +35,8 @@ def _rgba(c, a=1.0):
     return [float(c[0]), float(c[1]), float(c[2]), a]
 
 
-def build_spec(task: TaskSpec, cfg: dict, profile: RobotProfile | None = None) -> mujoco.MjSpec:
+def build_spec(task: TaskSpec, cfg: dict, profile: RobotProfile | None = None, extras=None) -> mujoco.MjSpec:
+    """`extras(spec)`: optional hook that adds things to the world (the virtual hardware rig adds tape marks and a camera)."""
     profile = profile or get_profile(DEFAULT_ROBOT)
     if profile.id == "so101":
         spec = mujoco.MjSpec.from_file(str(SO101_XML))
@@ -86,6 +89,8 @@ def build_spec(task: TaskSpec, cfg: dict, profile: RobotProfile | None = None) -
     if profile.id != "so101":                   # the SO-ARM101 model already carries its own wrist camera
         wc = cfg["sim"]["cameras"]["wrist"]
         hand.add_camera(name="wrist_cam", pos=[0.0, 0.0, 0.06], quat=[0, 1, 0, 0], fovy=wc["fovy"])
+    if extras is not None:
+        extras(spec)
     return spec
 
 

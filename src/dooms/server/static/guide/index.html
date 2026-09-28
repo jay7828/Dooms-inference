@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SO-101 Setup Guide</title>
+<style>
+  :root { --bg: #f7f7f4; --card: #fff; --ink: #26251e; --muted: #6f6c62; --line: #e6e5e0; --accent: #cf2d56; --ok: #1f8a65; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #1a1915; --card: #26251e; --ink: #f7f7f4; --muted: #a09c92; --line: #333129; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 -apple-system, "Inter", system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 19px; margin: 36px 0 8px; } h3 { font-size: 15px; margin: 18px 0 4px; }
+  p, li { color: var(--ink); } .muted { color: var(--muted); }
+  img { width: 100%; border-radius: 10px; border: 1px solid var(--line); background: #fff; margin: 8px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+  .warn { border-color: rgba(207,45,86,.35); } .warn b { color: var(--accent); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; } td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  code { font: 13px ui-monospace, Menlo, monospace; background: var(--line); padding: 1px 5px; border-radius: 4px; }
+  nav a { color: var(--muted); margin-right: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Connect a real SO-101 arm</h1>
+  <p class="muted">Everything happens in the app: open <b>Robot: SO101 → Mode: Real robot → Set up</b>. This page explains each step. Try every step first with the <b>Virtual SO-101</b> (pick it as the port): it behaves like a real arm, so you can learn the flow without hardware.</p>
+  <nav><a href="#need">What you need</a><a href="#connect">1 Connect</a><a href="#arm">2 Arm</a><a href="#camera">3 Camera</a><a href="#camcal">4 Camera calibration</a><a href="#test">5 Test</a><a href="#run">Running tasks</a><a href="#trouble">Troubleshooting</a></nav>
+
+  <div class="card warn"><b>Safety first.</b> Keep the arm's power switch within reach: it is the real emergency stop. The app's <b>Stop</b> button (or the Esc key) freezes the arm where it is. Keep hands out of the arm's reach while it moves, and start with a low speed.</div>
+
+  <h2 id="need">What you need</h2>
+  <table>
+    <tr><td>Robot</td><td>SO-101 <b>follower</b> arm (6 × STS3215 servos, IDs 1-6 as assembled with LeRobot), its 12 V power supply and USB cable.</td></tr>
+    <tr><td>Camera</td><td>One fixed overview camera: a USB webcam, or a phone used as a webcam (iPhone + Mac: Continuity Camera works with no setup; Android: DroidCam or IP Webcam). Plus a tripod or clamp.</td></tr>
+    <tr><td>Objects</td><td>Sized for the SO-101's gripper (opens 5.5 cm): 2.5 cm cubes, a small bottle about 4.6 cm tall with a ~1.4 cm cap, a tray about 11 × 11 cm with low walls.</td></tr>
+    <tr><td>Other</td><td>A table with a clamp for the arm's base, 6 small pieces of tape, a ruler.</td></tr>
+  </table>
+  <img src="wiring.png" alt="Wiring">
+
+  <h2 id="connect">1 · Connect</h2>
+  <p>Switch the arm's power on, plug its USB cable into the computer, pick the port and press <b>Connect</b>. The app checks that all six servos answer and shows the supply voltage and servo temperatures. On a Mac the arm appears as <code>/dev/cu.usbmodem…</code> or <code>/dev/cu.usbserial…</code>.</p>
+  <p>Then press <b>Run self-test</b>. It checks that all six servos answer and are the right model, how fast and reliable the USB link is, each servo's mode, torque limit, supply voltage, temperature and error flags, and (once the arm is calibrated) that the saved calibration matches and the wrist really bends 6° and back. Every problem comes with what to do about it. Run it again whenever something feels off.</p>
+
+  <h2 id="arm">2 · Arm calibration (once per arm)</h2>
+  <p>The app learns how each servo is mounted. The torque switches <b>off</b>, so hold the arm, then:</p>
+  <h3>a) Reference pose</h3>
+  <p>Move the arm into this "L" pose and press <b>Record reference pose</b>. It does not need to be perfect: the camera step later measures and corrects the small error.</p>
+  <img src="ref_pose.png" alt="Reference pose">
+  <h3>b) Directions</h3>
+  <p>For each joint the app shows one of these pictures. Move that joint the way the arrow shows, by about a quarter turn; the app moves on by itself.</p>
+  <div class="grid">
+    <img src="dir_shoulder_pan.png" alt="shoulder pan"><img src="dir_shoulder_lift.png" alt="shoulder lift">
+    <img src="dir_elbow_flex.png" alt="elbow flex"><img src="dir_wrist_flex.png" alt="wrist flex">
+    <img src="dir_wrist_roll.png" alt="wrist roll"><img src="dir_gripper.png" alt="gripper">
+  </div>
+  <h3>c) Range</h3>
+  <p>Move every joint slowly from one end of its travel to the other (as far as it goes without hitting the table) and open the gripper fully once. When the bars are full, press <b>Finish</b>. The limits are stored in the app and written to the servos, so they refuse to go further.</p>
+  <p class="muted">Check: with the torque off, move the arm by hand. The 3D arm must follow exactly. If one joint goes the wrong way, run the calibration again.</p>
+
+  <h2 id="camera">3 · Camera</h2>
+  <p>Place the camera 40-55 cm from the base and 35-45 cm high, looking down at about 45°, so it sees the whole work area. Fix it firmly: if it moves, redo step 4. Light the table evenly.</p>
+  <div class="grid"><img src="table_layout.png" alt="Table layout"><img src="camera_view.png" alt="Good camera view"></div>
+
+  <h2 id="camcal">4 · Camera calibration</h2>
+  <p>Stick 6 small tape marks on the table at the positions in the layout above (measured from the centre of the robot's base; they do not have to be exact). Clear the table of objects. Then for each mark:</p>
+  <ol><li>With the torque off, close the gripper and rest the <b>jaw tips</b> on the centre of the mark.</li><li>Click the same mark in the camera image.</li></ol>
+  <p>Press <b>Solve</b>. The app finds where the camera is and how wide it sees, and uses the touches to correct small arm-posing errors. A <b>GOOD</b> result is within a few pixels; a mark far off means a mis-click or a slipped touch: remove it and redo it. Then <b>Save</b>.</p>
+  <img src="touch_mark.png" alt="Touching a mark">
+
+  <h2 id="test">5 · Test</h2>
+  <p>Switch the torque on, press <b>Home</b>, tick <b>click to hover</b> and click a spot on the table in the camera image: the jaw tips go 2 cm above it. If they land on the spot, you are done. Also set the speed (start at 30-40 %).</p>
+  <table>
+    <tr><th>Always-on protection</th><th>What it does</th></tr>
+    <tr><td>Joint limits</td><td>Commands are clipped to the calibrated range; the servos also enforce it.</td></tr>
+    <tr><td>Speed cap</td><td>Every joint's speed is limited by the Speed setting.</td></tr>
+    <tr><td>Table guard</td><td>Refuses motions that would push the gripper into the table.</td></tr>
+    <tr><td>Collision detection</td><td>A joint that strains hard but cannot follow its command stops the arm (it holds in place).</td></tr>
+    <tr><td>Watchdogs</td><td>Stops on servo overheating (65 °C) or a supply voltage drop.</td></tr>
+    <tr><td>Stop / Esc</td><td>Freezes the arm where it is, at any time, including while Claude is thinking.</td></tr>
+  </table>
+  <img src="rest_pose.png" alt="Rest pose">
+
+  <h2 id="run">Running tasks</h2>
+  <p>Put the objects on the table, type a command and press <b>Run</b>. With the real robot, <b>Claude</b> plans and points at objects in the real camera image (the Demo planner only works with the virtual robot, which knows where its objects are). Tick <b>Dry run</b> in Options to see the plan and the motion in the 3D view without moving the arm. The first real run asks you to confirm.</p>
+  <p class="muted">Results on the real robot cannot be checked automatically; the app reports "Finished without errors" and you judge the outcome. With the virtual robot, results are verified.</p>
+
+  <h2 id="trouble">Troubleshooting</h2>
+  <table>
+    <tr><td>Self-test: "Link speed" too slow</td><td>Use a short USB cable straight into the computer (no hub). On Linux with an FTDI adapter, set its latency timer to 1 ms.</td></tr>
+    <tr><td>Self-test: "Calibration" does not match</td><td>Another arm, or the servos were reset: run the arm calibration again.</td></tr>
+    <tr><td>"No servos answered"</td><td>Power off, wrong port (pick the follower arm, not a leader arm), or USB cable is charge-only.</td></tr>
+    <tr><td>"Servos not answering: …"</td><td>A daisy-chain cable between two servos is loose.</td></tr>
+    <tr><td>The 3D arm moves the wrong way</td><td>Redo the arm calibration; move exactly as the pictures show in the Directions step.</td></tr>
+    <tr><td>Camera does not open (Mac)</td><td>System Settings → Privacy &amp; Security → Camera: allow the app (or Terminal when running the web version).</td></tr>
+    <tr><td>Hover test lands off the spot</td><td>The camera moved or a click was off: redo the camera calibration.</td></tr>
+    <tr><td>"… is overloaded"</td><td>Something blocked the arm. Clear it; the arm holds where it stopped.</td></tr>
+    <tr><td>"Lost the connection"</td><td>Power or USB dropped. Check both and reconnect; calibration is kept.</td></tr>
+  </table>
+</main>
+</body>
+</html>

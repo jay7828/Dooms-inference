@@ -1,5 +1,6 @@
 // Dooms studio — UI logic. Talks to the server over one WebSocket (events + live poses) and a few REST endpoints.
 import { createViewer } from "/static/viewer.js";
+import { createRobot } from "/static/robot.js";
 
 const API = (window.DOOMS_API || "").replace(/\/$/, ""); // "" = same origin; set in config.js when the UI is hosted apart from the backend
 const $ = (s, r = document) => r.querySelector(s);
@@ -17,7 +18,7 @@ const I = {
 
 /* ------------------------------------------------------------------ state */
 const S = {
-  ws: null, cfg: null, scenes: {}, running: false, scene: "sandbox", planner: "scripted", grounding: "vlm", speed: "1",
+  ws: null, cfg: null, scenes: {}, running: false, scene: "sandbox", robot: "franka", mode: "sim", planner: "scripted", grounding: "vlm", speed: "1",
   aws: null,                       // {mode, creds, region, model, identity} once validated
   run: null, frameUrl: null, t0: 0,
 };
@@ -43,6 +44,8 @@ function seg(root, onchange) {
 const segPlanner = seg($("#seg-planner"), (v) => { S.planner = v; renderPlannerNote(); });
 const segGround = seg($("#seg-grounding"), (v) => (S.grounding = v));
 const segSpeed = seg($("#seg-speed"), (v) => (S.speed = v));
+const segRobot = seg($("#seg-robot"), (v) => setRobot(v));
+const segMode = seg($("#seg-mode"), (v) => setMode(v));
 const logLine = (msg, cls = "") => {
   const d = document.createElement("div");
   if (cls) d.className = cls;
@@ -51,6 +54,39 @@ const logLine = (msg, cls = "") => {
   $("#log").appendChild(d);
   $("#log").scrollTop = 1e9;
 };
+
+/* ------------------------------------------------------------------ real robot */
+const RB = createRobot({
+  $, $$, esc, toast, I,
+  send: (m) => { if (S.ws?.readyState === 1) S.ws.send(JSON.stringify(m)); },
+  scene: () => S.scene, seed: () => +$("#seed").value || 0,
+  onChange: () => { if (S.mode === "real") $("#pill-sim").textContent = RB.status.connected ? "live" : "offline"; },
+});
+const real = () => S.mode === "real" && S.robot === "so101";
+const realAvailable = () => S.cfg?.real_robot?.available !== false;
+function renderRealPanels() {
+  const isReal = real(), ok = realAvailable();
+  $("#robot-bar").hidden = !isReal || !ok; $("#row-dry").hidden = !isReal || !ok;
+  $("#robot-hosted").hidden = !isReal || ok;
+  if (isReal && !ok) {
+    $("#robot-hosted-text").textContent = S.cfg.real_robot.reason;
+    const dl = $("#robot-hosted-dl"); dl.hidden = !S.cfg.real_robot.desktop_url; if (S.cfg.real_robot.desktop_url) dl.href = S.cfg.real_robot.desktop_url;
+  }
+}
+function setMode(m) {
+  if (S.running) { segMode.set(S.mode); return; }
+  S.mode = m === "real" && S.robot === "so101" ? "real" : "sim";
+  segMode.set(S.mode);
+  try { localStorage.setItem("dooms.mode", S.mode); } catch { /* private mode */ }
+  const isReal = real();
+  renderRealPanels();
+  $("#btn-reset").hidden = isReal; $("#seed").closest(".prow").hidden = isReal;
+  if (isReal && S.planner === "scripted" && RB.status.connected && !RB.status.virtual) { S.planner = "bedrock"; segPlanner.set("bedrock"); renderPlannerNote(); }
+  resetRun(); loadScene();
+  if (!isReal && S.ws?.readyState === 1) S.ws.send(JSON.stringify({ type: "load", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 }));
+  if (isReal && realAvailable()) { RB.refresh(); RB.renderBar(); }
+}
+function renderModeRow() { $("#row-mode").hidden = S.robot !== "so101" || !(S.cfg.real_robots || []).includes("so101"); }
 
 /* ------------------------------------------------------------------ AWS credentials (memory + optional browser storage) */
 const AWS_KEY = "dooms.aws";
@@ -154,9 +190,23 @@ const SCENE_INFO = {
   sandbox: ["Sandbox"], sandbox_fallen: ["Knocked-over bottle"], sandbox_blocked: ["Box beside the bottle"],
   put_bottle_in_box: ["Bottle → box"], put_cube_in_box: ["Cube → box"], stack_cubes: ["Stack cubes"],
 };
+function renderRobots() {
+  $("#seg-robot").innerHTML = (S.cfg.robots || []).map((r) => `<button data-value="${esc(r.id)}" title="${esc(r.label)} (${r.dof} joints)">${esc(r.id === "so101" ? "SO101" : r.label.split(" ")[0])}</button>`).join("");
+  segRobot.set(S.robot);
+  $("#seg-robot").closest(".prow").hidden = (S.cfg.robots || []).length < 2;
+}
+function setRobot(id) {
+  if (S.running || id === S.robot) { segRobot.set(S.robot); return; }
+  S.robot = id;
+  try { localStorage.setItem("dooms.robot", id); } catch { /* private mode */ }
+  if (!S.scenes[S.scene]?.robots.includes(id)) { S.scene = "sandbox"; }
+  renderModeRow();
+  if (id !== "so101" && S.mode === "real") { setMode("sim"); }
+  renderScenes(); fillExamples(true); resetScene(); loadSkills();
+}
 function renderScenes() {
   const sel = $("#scene");
-  sel.innerHTML = Object.values(S.scenes).map((s) => `<option value="${esc(s.name)}">${esc((SCENE_INFO[s.name] || [s.name])[0])}</option>`).join("");
+  sel.innerHTML = Object.values(S.scenes).filter((s) => !s.robots || s.robots.includes(S.robot)).map((s) => `<option value="${esc(s.name)}">${esc((SCENE_INFO[s.name] || [s.name])[0])}</option>`).join("");
   sel.value = S.scene;
   sel.onchange = () => { if (S.running) return; S.scene = sel.value; fillExamples(true); resetScene(); };
 }
@@ -176,7 +226,8 @@ $("#opt-toggle").onclick = () => { const o = $("#options"); o.hidden = !o.hidden
 async function loadScene() {
   $("#loading").style.display = "grid";
   try {
-    const sc = await (await fetch(API + `/api/scene/${S.scene}?seed=${+$("#seed").value || 0}`)).json();
+    const sc = await (await fetch(API + `/api/scene/${S.scene}?seed=${+$("#seed").value || 0}&robot=${S.robot}${real() ? "&mode=real" : ""}`)).json();
+    V.setDefaultView(sc.view);
     V.buildScene(sc);
     $("#loading").style.display = "none";
   } catch (e) { $("#loading").textContent = "Could not load the 3D scene."; }
@@ -184,7 +235,8 @@ async function loadScene() {
 function resetScene() {
   if (S.running) return;
   resetRun(); loadScene();
-  if (S.ws?.readyState === 1) S.ws.send(JSON.stringify({ type: "reset", scene: S.scene, seed: +$("#seed").value || 0 }));
+  if (real()) return;                              // a real table is arranged by hand
+  if (S.ws?.readyState === 1) S.ws.send(JSON.stringify({ type: "reset", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 }));
 }
 function showSceneState(ev) {
   const el = $("#scene-state"), dirty = ev.runs > 0;
@@ -257,15 +309,17 @@ function renderSkills(list) {
   $("#skills-list").innerHTML = list.length ? list.map((s) => `<details class="skill"><summary><b>${esc(s.name)}</b><span class="st">${s.successes}/${s.uses} ok</span></summary><p>${esc(s.description)}</p><pre class="code">roles: ${esc(s.roles.join(", ") || "—")}\n${s.controllers.map(esc).join("\n")}</pre></details>`).join("")
     : `<div class="empty">No skills yet</div>`;
 }
-async function loadSkills() { try { renderSkills(await (await fetch(API + "/api/skills")).json()); } catch { /* ignore */ } }
-$("#btn-clearskills").onclick = async () => { if (confirm("Delete all stored skills?")) { await fetch(API + "/api/skills", { method: "DELETE" }); loadSkills(); } };
+async function loadSkills() { try { renderSkills(await (await fetch(API + "/api/skills?robot=" + S.robot)).json()); } catch { /* ignore */ } }
+$("#btn-clearskills").onclick = async () => { if (confirm("Delete all stored skills?")) { await fetch(API + "/api/skills?robot=" + S.robot, { method: "DELETE" }); loadSkills(); } };
 
 /* ------------------------------------------------------------------ event stream */
 function handle(ev) {
   const R = S.run;
+  if (ev.type.startsWith("hw_")) return RB.handle(ev);
   switch (ev.type) {
     case "started":
       S.t0 = Date.now();
+      if (ev.mode === "real") logLine(ev.dry_run ? "Real robot · dry run: the arm stays still, the 3D arm previews the motion" : "Real robot: the arm is moving", "w");
       logLine(`“${ev.instruction}” · ${ev.planner === "bedrock" ? "Claude" : "demo"} · seed ${ev.seed}${ev.continuing ? " · continuing" : ""}`);
       if (!ev.verified) logLine("No ground-truth check exists for this command", "w");
       break;
@@ -339,28 +393,50 @@ function finish(r) {
 function setRunning(v) {
   S.running = v;
   const b = $("#run");
+  b.disabled = false;
   b.className = "btn " + (v ? "danger" : "primary");
   b.innerHTML = v ? `${I.stop}<span>Stop</span>` : `${I.play}<span>Run</span>`;
   ["#task", "#seed", "#seed-dice", "#btn-reset", "#skills"].forEach((s) => ($(s).disabled = v));
-  $$("#scene, #seg-planner button, #seg-grounding button").forEach((x) => (x.disabled = v));
+  $$("#scene, #seg-robot button, #seg-mode button, #seg-planner button, #seg-grounding button, #dry-run").forEach((x) => (x.disabled = v));
 }
 function start() {
   if (!S.ws || S.ws.readyState !== 1) return toast("err", "Not connected", "The server connection is down. Retrying…");
   if (!V.ready) return toast("info", "Still loading", "The 3D scene is not ready yet.");
   if (S.planner === "bedrock" && !S.aws && !(S.cfg.bedrock_ready && !S.cfg.require_user_keys)) { openAws(); return toast("info", "Connect AWS first", "Add your credentials to use Claude."); }
+  if (real() && !realAvailable()) return toast("info", "Use the desktop app", S.cfg.real_robot.reason);
+  if (real()) {
+    if (!RB.ready()) { RB.open(); return toast("info", "Finish the robot setup", "Connect, calibrate the arm and the camera first."); }
+    const dry = $("#dry-run").checked;
+    if (!dry && !S.confirmed) return confirmMove(() => { S.confirmed = $("#confirm-skip").checked; launch(); });
+  }
+  launch();
+}
+function confirmMove(go) {
+  const m = $("#confirm-modal");
+  $("#confirm-go").onclick = () => { m.close(); go(); };
+  $("#confirm-cancel").onclick = () => m.close();
+  m.showModal();
+}
+function launch() {
   resetRun(); setRunning(true); S.t0 = Date.now();
-  const msg = { type: "run", scene: S.scene, instruction: $("#task").value.trim(), llm: S.planner, grounding: S.grounding, speed: +S.speed, skills: $("#skills").checked, seed: +$("#seed").value || 0 };
+  const msg = { type: "run", scene: S.scene, robot: S.robot, instruction: $("#task").value.trim(), llm: S.planner, grounding: S.grounding, speed: +S.speed, skills: $("#skills").checked, seed: +$("#seed").value || 0 };
   if (S.planner === "bedrock" && S.aws) { msg.credentials = { ...S.aws.creds }; msg.model = S.aws.model; }
+  if (real()) { msg.mode = "real"; msg.dry_run = $("#dry-run").checked; }
   S.ws.send(JSON.stringify(msg));
 }
-$("#run").onclick = () => (S.running ? S.ws.send(JSON.stringify({ type: "stop" })) : start());
+$("#run").onclick = () => {
+  if (!S.running) return start();
+  S.ws.send(JSON.stringify({ type: "stop" }));
+  const b = $("#run"); b.disabled = true; b.querySelector("span").textContent = "Stopping…";   // until the server confirms
+};
 
 function connect() {
   const ws = (S.ws = new WebSocket((API ? API.replace(/^http/, "ws") : (location.protocol === "https:" ? "wss://" : "ws://") + location.host) + "/ws"));
   ws.binaryType = "arraybuffer";
   ws.onopen = () => {
     $("#conn").classList.add("on"); $("#conn").title = "Connected";
-    ws.send(JSON.stringify({ type: "load", scene: S.scene, seed: +$("#seed").value || 0 }));
+    if (!real()) ws.send(JSON.stringify({ type: "load", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 }));
+    else if (realAvailable()) RB.refresh();
     const q = new URLSearchParams(location.search); // ?autorun=1&scene=&cmd=&speed=&seed=&planner=  (demos / tests)
     if (q.has("autorun") && !window.__ran) {
       window.__ran = true;
@@ -381,10 +457,11 @@ function connect() {
     if (kind === 1) { // live body poses: [t, nbody * (x y z qw qx qy qz)]
       const f = new Float32Array(m.data, 4);
       if (V.ready) V.applyPoses(f.subarray(1));
-      $("#pill-sim").textContent = `t = ${f[0].toFixed(1)} s`; if (S.running) $("#m-sim").textContent = f[0].toFixed(1) + " s";
+      if (!real()) $("#pill-sim").textContent = `t = ${f[0].toFixed(1)} s`;
+      if (S.running) $("#m-sim").textContent = f[0].toFixed(1) + " s";
     } else { // agent camera frame
       const url = URL.createObjectURL(new Blob([m.data.slice(4)], { type: "image/jpeg" })), old = S.frameUrl;
-      $("#frame").src = url; S.frameUrl = url; if (old) setTimeout(() => URL.revokeObjectURL(old), 500);
+      $("#frame").src = url; S.frameUrl = url; RB.frame(url); if (old) setTimeout(() => URL.revokeObjectURL(old), 2000);
     }
   };
 }
@@ -397,6 +474,7 @@ $$("#tabs .tab").forEach((t) => (t.onclick = () => {
   $$(".pane").forEach((p) => p.classList.toggle("on", p.id === "pane-" + t.dataset.pane));
 }));
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && modal.open) modal.close(); });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape" && real() && (S.running || RB.status.connected)) RB.stop(); });
 
 /* ------------------------------------------------------------------ boot */
 (async function init() {
@@ -404,7 +482,10 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && modal.op
   buildAgents(); resetRun();
   S.cfg = await (await fetch(API + "/api/config")).json();
   S.cfg.scenes.forEach((s) => (S.scenes[s.name] = s));
-  if (!S.scenes[S.scene]) S.scene = S.cfg.scenes[0].name;
-  renderScenes(); fillExamples(true); renderAwsChip(); renderSkills([]);
+  try { const r = localStorage.getItem("dooms.robot"); if (r && (S.cfg.robots || []).some((x) => x.id === r)) S.robot = r; } catch { /* private mode */ }
+  if (!S.scenes[S.scene] || !S.scenes[S.scene].robots.includes(S.robot)) S.scene = "sandbox";
+  renderRobots(); renderModeRow(); renderScenes(); fillExamples(true); renderAwsChip(); renderSkills([]);
+  try { if (localStorage.getItem("dooms.mode") === "real" && S.robot === "so101") { S.mode = "real"; segMode.set("real"); } } catch { /* private mode */ }
+  renderRealPanels(); $("#btn-reset").hidden = real(); $("#seed").closest(".prow").hidden = real();
   connect(); loadScene(); loadSkills();
 })();

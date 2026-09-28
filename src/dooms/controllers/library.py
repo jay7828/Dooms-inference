@@ -47,7 +47,7 @@ Force(axis, value)
 
 Gripper(action)
   action = open | close | width. `open` releases, `close` grasps whatever is between the fingers,
-  `width` sets an explicit opening in metres (parameter name g). Max opening 0.08 m.
+  `width` sets an explicit opening in metres (parameter name g). Max opening {max_width} m.
 
 Relative moves: PosAlign(eef_tcp, eef_tcp, axis, offset) moves the gripper by `offset` along `axis` from where it is
 when the stage starts (lift, retract, sideways push). With the gripper closed this is how an object is pushed.
@@ -58,6 +58,20 @@ stage share priority 1; orientation AxisAlign gets priority 2 unless orientation
 Stages: `stage` 0,1,2... run one after another; a stage ends when all its controllers converged.
 Use a later stage when one action must finish before another starts (e.g. open the gripper THEN retract).
 """
+
+
+_FORCE_DOC_START = "Force(axis, value)"
+_GRIPPER_DOC_START = "Gripper(action)"
+
+
+def controller_doc(max_width: float = 0.08, force_sensor: bool = True) -> str:
+    """CONTROLLER_LIBRARY_DOC for one robot: its gripper opening, and without the Force controller if it has no sensor."""
+    doc = CONTROLLER_LIBRARY_DOC
+    if not force_sensor:
+        a, b = doc.index(_FORCE_DOC_START), doc.index(_GRIPPER_DOC_START)
+        doc = doc[:a] + ("Force: NOT AVAILABLE on this robot (no force sensor). Lower onto surfaces with a small PosAlign "
+                         "z offset instead.\n\n") + doc[b:]
+    return doc.replace("{max_width}", f"{max_width:g}")
 
 
 def build_controller(spec, values: dict[str, float]) -> Controller:
