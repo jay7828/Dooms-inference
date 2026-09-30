@@ -24,6 +24,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "httpx"]
 web = ["fastapi", "uvicorn[standard]"]
+recon = ["open3d", "trimesh"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
