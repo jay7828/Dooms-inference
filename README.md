@@ -138,10 +138,13 @@ small calls (roughly 14k tokens); the labels are small and subjective, so treat 
 leaderboard.
 
 ## Status
-Verified in simulation with the scripted stand-in for the LLM (12/12 bottle→box, 12/12 cube→box, 11/12 stacking with
-simulated 6 px / 1 px pointing noise). **The live Bedrock path has not been run yet** (no credentials were
-available while building): the request shape is covered by a unit test against a fake client; the prompts and the
-VLM pointing accuracy on real Claude answers are untested.
+* **Scripted stand-in for the LLM** (simulated 6 px / 1 px pointing noise): 12/12 bottle→box, 12/12 cube→box, 11/12 stacking.
+* **Live Claude on Bedrock** (Sonnet 4.5, `runs/bench_claude`): 15/15 episodes succeeded
+  (5 seeds each of bottle→box, cube→box and stack cubes), on average 8 LLM calls and about $0.11 per episode.
+  Small sample, simulation only.
+* **Jev advisor:** integrated and smoke-tested against the live API, but the offline decision benchmark
+  (`scripts/bench_jev_decisions.py`) has not been completed yet, so there are no accuracy numbers for Jev vs the rules.
+* The real SO-101 path is covered by tests and a virtual servo rig; results on physical hardware are not reported here.
 
 ## Robots
 
