@@ -1,0 +1,13 @@
+Dooms inference
+Copyright 2026 Dooms inference
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components included in this repository:
+
+* Franka Emika Panda MJCF model, from MuJoCo Menagerie (Google DeepMind). Apache-2.0.
+  src/dooms/sim/scenes/assets/franka_emika_panda/ (see the LICENSE and README there).
+* The Robot Studio SO-101 MJCF model, from MuJoCo Menagerie, based on the SO-ARM100 design by The Robot Studio.
+  Apache-2.0. src/dooms/sim/scenes/assets/robotstudio_so101/ (see the LICENSE and README there).
+* Jev ("System One") typed-decision models are provided by TypeSafe AI through a hosted API; no model weights or
+  API code from TypeSafe are included here. Jev AI (jev-ai.pro) provides a compatible endpoint.
