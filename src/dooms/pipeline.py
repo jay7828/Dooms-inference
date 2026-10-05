@@ -21,6 +21,7 @@ from .execution.runtime import Runtime
 from .llm.base import LLMClient, Usage
 from .controllers.library import keypoint_of
 from .llm.schemas import Decomposition, KeypointRequest, Subtask
+from .advisor import make_advisor
 from .monitor import Monitor
 from .perception.keypoint_store import KeypointStore
 from .skills import Skill, SkillLibrary, generalize
@@ -53,6 +54,11 @@ class EpisodeResult:
     output_tokens: int = 0
     cost_usd: float = 0.0
     llm_latency_s: float = 0.0
+    jev_calls: int = 0
+    jev_latency_s: float = 0.0
+    jev_cost_usd: float = 0.0
+    advisor: str = "rules"
+    advisor_log: list = field(default_factory=list)   # shadow mode: rule-vs-Jev answers per decision
     wall_s: float = 0.0
     sim_s: float = 0.0
     grounding_err_mm: list = field(default_factory=list)
@@ -90,6 +96,7 @@ class Pipeline:
                          else VisionGrounder(llm, bc, refine_iters=pc["refine_iters"]))
         self.runtime = Runtime(env, cfg, env.q_home)
         self.monitor = Monitor(getattr(env, "grasp_min_width", env.profile.grasp_min_width))
+        self.advisor = make_advisor(cfg)
         self.store = KeypointStore()
         self.res: EpisodeResult | None = None
         self._t_start = 0.0
@@ -323,6 +330,9 @@ class Pipeline:
                 self.emit({"type": "subtask_start", "id": sid, "name": name, "attempt": attempt, "script": script.to_text()})
                 out = self.runtime.run_subtask(script, snap, on_stage_done=self._stage_done)
                 verdict = self.monitor.check(script, out)
+                verdict = self.advisor.verdict(
+                    verdict, name=name, actions=[c.action for st in script.stages for c in st if c.name == "Gripper"],
+                    res=out, holding=self.monitor.holding, expect_grasp=self.monitor.expect_grasp)
                 self.res.subtask_log.append({
                     "plan": tag, "subtask": sid, "name": name, "attempt": attempt, "reason": out.reason,
                     "sim_s": round(out.sim_seconds, 2), "gripper_mm": round(out.gripper_width * 1000, 1),
@@ -347,6 +357,9 @@ class Pipeline:
         t0 = time.time()
         self.res = res = EpisodeResult(task=self.task.name, seed=seed)
         self.llm.usage = Usage()
+        if self.advisor.usage is not None:
+            self.advisor.usage.calls.clear()
+            self.advisor.shadow.clear()
         for a in (self.decomposer, self.skillgen, self.paramset, self.grounder):
             getattr(a, "trace", []).clear()
         pc = self.cfg["pipeline"]
@@ -367,13 +380,17 @@ class Pipeline:
                 dec, recipes, params = self._plan(failure)
                 self._save(f"plan_{plan_no}.json", {"subtasks": dec.model_dump(), "recipes": recipes.model_dump(),
                                                     "params": params.model_dump(), "failure_context": failure})
-                tries = 0
+                tries, action = 0, "replan"
                 while True:
                     failure = self._execute_plan(
                         dec, recipes, params, tag=f"p{plan_no}" + (f"r{tries}" if tries else ""),
                         check_obstacles=(not dec.clears_obstacle) and obstacle_rounds < pc.get("max_obstacle_rounds", 2))
-                    if (failure is None or failure.startswith("OBSTACLE:") or tries >= pc.get("max_regrounds", 0)
-                            or "time budget" in failure):
+                    if failure is None or failure.startswith("OBSTACLE:") or "time budget" in failure:
+                        break
+                    action = self.advisor.recovery(
+                        failure, regrounds_used=tries, max_regrounds=pc.get("max_regrounds", 0), replans_used=replans_used,
+                        gripper_mm=self.env.state().gripper_width * 1000, sim_s=self.env.state().t - self._t_start)
+                    if action != "reground":
                         break
                     # targeted feedback: the plan is probably fine, the perception was not -> home, look again, re-run
                     tries += 1
@@ -399,7 +416,7 @@ class Pipeline:
                     self.emit({"type": "obstacle", "text": res.obstacles[-1]})
                     continue                                       # `failure` is handed to the agents as planning context
                 res.error = failure
-                if replans_used < pc["max_replans"]:
+                if action != "give_up" and replans_used < pc["max_replans"]:
                     replans_used += 1
                     res.replans += 1
                     self.emit({"type": "replan", "reason": failure})
@@ -430,6 +447,12 @@ class Pipeline:
         res.input_tokens, res.output_tokens = u.input_tokens, u.output_tokens
         res.cost_usd = u.cost(self.cfg["bedrock"]["pricing"])
         res.llm_latency_s = u.latency_s
+        res.advisor = self.advisor.name
+        if self.advisor.usage is not None:
+            j = self.advisor.usage
+            res.jev_calls, res.jev_latency_s = j.n_calls, j.latency_s
+            res.jev_cost_usd = j.cost(self.cfg.get("jev", {}).get("pricing", {"input_per_m": 0.042, "output_per_m": 0.0}))
+            res.advisor_log = list(getattr(self.advisor, "shadow", []))
         res.wall_s = time.time() - t0
         res.sim_s = self.env.state().t - getattr(self, "_t_start", 0.0)
         if self.run_dir is not None:

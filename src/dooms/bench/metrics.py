@@ -20,6 +20,13 @@ def _mean(xs):
     return sum(xs) / len(xs) if xs else float("nan")
 
 
+def _agreement(eps: list[dict]) -> float:
+    """Shadow mode: share of decisions where Jev gave the same answer as the rules."""
+    recs = [r for e in eps for r in e.get("advisor_log", [])]
+    same = [(r["rule_ok"] == r["jev_ok"]) if r["kind"] == "verdict" else (r["rule"] == r["jev"]) for r in recs]
+    return sum(same) / len(same) if same else float("nan")
+
+
 def aggregate(episodes: list[dict]) -> list[dict]:
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for e in episodes:
@@ -39,6 +46,10 @@ def aggregate(episodes: list[dict]) -> list[dict]:
             "output_tokens": _mean([e["output_tokens"] for e in eps]),
             "cost_usd": _mean([e["cost_usd"] for e in eps]),
             "llm_latency_s": _mean([e["llm_latency_s"] for e in eps]),
+            "jev_calls": _mean([e.get("jev_calls", 0) for e in eps]),
+            "jev_latency_s": _mean([e.get("jev_latency_s", 0.0) for e in eps]),
+            "jev_cost_usd": _mean([e.get("jev_cost_usd", 0.0) for e in eps]),
+            "shadow_agreement": _agreement(eps),
             "wall_s": _mean([e["wall_s"] for e in eps]),
             "sim_s": _mean([e["sim_s"] for e in eps]),
             "grounding_err_mm": _mean(errs),

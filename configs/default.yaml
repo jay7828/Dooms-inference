@@ -25,5 +25,13 @@ pipeline:
   max_regrounds: 2           # on failure: go home, look again (vision only) and re-run the SAME plan, before any replan
   max_subtask_retries: 0     # repeating the same subtask rarely helps; a fresh look (max_regrounds) does
   max_replans: 1
+  advisor: rules             # rules | monitor | recovery | both | shadow  (all but rules call TypeSafe Jev)
   record_video: true
   video_fps: 20
+jev:
+  endpoint: https://jev-ai.pro/api/v1/systemone
+  model: jev-latest
+  timeout_s: 30
+  min_confidence: 0.0        # below this the rule-based answer is kept
+  retry: {max_attempts: 3, base_delay_s: 0.5}
+  pricing: {input_per_m: 0.042, output_per_m: 0.0}

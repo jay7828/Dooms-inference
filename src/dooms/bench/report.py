@@ -21,13 +21,14 @@ def write_report(out_dir: Path) -> list[dict]:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    lines = ["| variant | task | n | success (95% CI) | subtasks | LLM calls | tokens in/out | cost $ | LLM s | sim s | ground err mm |",
-             "|---|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| variant | task | n | success (95% CI) | subtasks | LLM calls | tokens in/out | cost $ | LLM s | Jev calls / s / $ | Jev agrees | sim s | ground err mm |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         lines.append(f"| {r['variant']} | {r['task']} | {r['episodes']} | {r['success_rate']:.0%} "
                      f"({r['ci_low']:.0%}-{r['ci_high']:.0%}) | {r['subtask_success']:.0%} | {r['llm_calls']:.1f} | "
                      f"{r['input_tokens']:.0f}/{r['output_tokens']:.0f} | {r['cost_usd']:.3f} | {r['llm_latency_s']:.1f} | "
-                     f"{r['sim_s']:.0f} | {r['grounding_err_mm']:.1f} |")
+                     f"{r['jev_calls']:.1f} / {r['jev_latency_s']:.2f} / {r['jev_cost_usd']:.5f} | "
+                     f"{r['shadow_agreement']:.0%} | {r['sim_s']:.0f} | {r['grounding_err_mm']:.1f} |")
     (out_dir / "summary.md").write_text("\n".join(lines) + "\n")
     _plot(rows, out_dir / "success_rate.png")
     return rows
