@@ -114,11 +114,37 @@ mean grounding error vs simulator ground truth (mm). Ablations (`bench/ablations
   current scene (arm returns home first).
 * Swapping simulator/robot: implement `sim.base.RobotInterface` / `SimEnv`.
 
+## Jev advisor (optional)
+Two small decisions in the pipeline can be made by a typed-decision model, [Jev](https://typesafe.ai) ("System One",
+by TypeSafe AI), instead of the hand-written rules: *did this subtask succeed* (yes/no with a probability) and *which
+recovery after a failure* (`reground` / `replan` / `give_up`). Jev returns typed answers with a confidence, not text,
+so low-confidence answers fall back to the rules. Code: `src/dooms/advisor.py`, `src/dooms/llm/jev_client.py`.
+
+```bash
+# .env: JEV_AI_API_KEY=...   (server-side only; keys come from https://jev-ai.pro/jev-api)
+.venv/bin/python scripts/check_jev.py                 # one tiny call, prints the raw response
+```
+Set `pipeline.advisor` in `configs/default.yaml`: `rules` (default, no network) | `monitor` | `recovery` | `both` |
+`shadow` (rules decide, Jev's answer is only logged, so one real run gives rule-vs-Jev agreement at no risk).
+`jev.min_confidence` keeps the rule answer below that confidence. The client retries only 429/502/503 (honouring
+`Retry-After`) and never resends after a timeout or 504, whose outcome is uncertain.
+
+### Benchmarking the decisions
+`scripts/bench_jev_decisions.py [--repeat N]` is an offline benchmark that needs no simulator: it scores Jev against the
+rule-based advisor (and Claude with `--claude`, which makes paid Bedrock calls) on labelled cases. The 12 recovery cases
+are hand-labelled failure texts; the verdict cases replay recorded subtask logs plus perturbed copies with a known label
+(grasp closed on nothing, object dropped, ...). It reports accuracy, latency and cost per decision. One pass is about 33
+small calls (roughly 14k tokens); the labels are small and subjective, so treat the numbers as a sanity check, not a
+leaderboard.
+
 ## Status
-Verified in simulation with the scripted stand-in for the LLM (12/12 bottle→box, 12/12 cube→box, 11/12 stacking with
-simulated 6 px / 1 px pointing noise). **The live Bedrock path has not been run yet** (no credentials were
-available while building): the request shape is covered by a unit test against a fake client; the prompts and the
-VLM pointing accuracy on real Claude answers are untested.
+* **Scripted stand-in for the LLM** (simulated 6 px / 1 px pointing noise): 12/12 bottle→box, 12/12 cube→box, 11/12 stacking.
+* **Live Claude on Bedrock** (Sonnet 4.5, `runs/bench_claude`): 15/15 episodes succeeded
+  (5 seeds each of bottle→box, cube→box and stack cubes), on average 8 LLM calls and about $0.11 per episode.
+  Small sample, simulation only.
+* **Jev advisor:** integrated and smoke-tested against the live API, but the offline decision benchmark
+  (`scripts/bench_jev_decisions.py`) has not been completed yet, so there are no accuracy numbers for Jev vs the rules.
+* The real SO-101 path is covered by tests and a virtual servo rig; results on physical hardware are not reported here.
 
 ## Robots
 
@@ -145,3 +171,7 @@ every step on a simulated arm that speaks the same servo protocol. Full guide wi
 
 Code: `src/dooms/hardware/` (Feetech bus protocol, arm driver + calibration, camera + camera calibration, the pipeline's
 real-robot environment, the setup session, and the virtual rig used for testing). Tests: `tests/test_hardware.py`.
+
+## License
+Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE) (the robot models under `src/dooms/sim/scenes/assets/` keep
+their own Apache-2.0 licenses).
