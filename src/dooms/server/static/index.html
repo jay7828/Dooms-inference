@@ -3,184 +3,519 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dooms · Research</title>
-<meta name="description" content="Dooms: language-driven robot manipulation. Four cooperating Claude agents turn a sentence and a depth image into controller skills, and the whole simulator runs in your browser.">
+<title>Dooms: language-driven robot manipulation</title>
+<meta name="description" content="Dooms turns one sentence and one depth image into controller skills for a robot arm. Four Claude agents plan, a MuJoCo simulation runs it, all inside your browser.">
+<meta property="og:title" content="Dooms: language-driven robot manipulation">
+<meta property="og:image" content="/static/landing/studio.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="/static/landing/studio.jpg">
 <style>
+  /* One theme (dark: every asset is a dark simulator render), one accent (amber), radii: 14px surfaces, 10px controls. */
   :root {
-    --bg: #0a0a0c; --surface: #101013; --surface-2: #16161a; --border: #212127; --border-2: #2c2c34;
-    --text: #ececef; --text-2: #a1a1aa; --muted: #70707b; --accent: #5b7cfa; --accent-h: #6f8cff;
-    --accent-soft: rgba(91,124,250,.13); --ok: #3fb68b;
-    --sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --bg: #0b0b0d; --bg-2: #101013; --surface: #141418; --line: #24242b; --line-2: #33333c;
+    --text: #f1f1f3; --text-2: #a9a9b4; --muted: #74747f;
+    --accent: #f0a04b; --accent-ink: #1b1206; --accent-soft: rgba(240,160,75,.12);
+    --sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --r: 14px; --r-s: 10px; --ease: cubic-bezier(.16, 1, .3, 1);
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
-  a { color: var(--accent-h); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  code, .mono { font-family: var(--mono); font-size: .9em; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
-  nav { position: sticky; top: 0; z-index: 5; background: rgba(10,10,12,.82); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
-  nav .wrap { display: flex; align-items: center; gap: 22px; height: 56px; }
-  nav .brand { font-weight: 700; letter-spacing: .02em; color: var(--text); }
-  nav .sp { flex: 1; }
-  nav a.l { color: var(--text-2); font-size: 14px; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border-2);
-         background: var(--surface-2); color: var(--text); font-weight: 500; font-size: 15px; cursor: pointer; }
-  .btn:hover { text-decoration: none; border-color: var(--muted); }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn.primary:hover { background: var(--accent-h); }
-  .btn.sm { padding: 6px 12px; font-size: 13px; }
-  .hero { padding: 88px 0 56px; }
-  .eyebrow { font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent-h); }
-  h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -.03em; margin: 14px 0 18px; max-width: 16em; }
-  .lead { color: var(--text-2); font-size: 19px; max-width: 40em; margin: 0 0 28px; }
-  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
-  section { padding: 56px 0; border-top: 1px solid var(--border); }
-  h2 { font-size: 28px; letter-spacing: -.02em; margin: 0 0 8px; }
-  .sub { color: var(--text-2); margin: 0 0 28px; max-width: 42em; }
-  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-  .card h3 { margin: 0 0 6px; font-size: 16px; }
-  .card p { margin: 0; color: var(--text-2); font-size: 14.5px; }
-  .no { font: 600 12px var(--mono); color: var(--accent-h); }
-  .step .nm { font-size: 20px; font-weight: 600; margin: 4px 0; }
-  .demo { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-  .demo-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
-  .demo-bar .grow { flex: 1; }
-  .demo-bar .tag { font: 12px var(--mono); color: var(--muted); }
-  .stage { position: relative; height: min(78vh, 720px); min-height: 460px; background: #08080a; }
+  html { scroll-behavior: smooth; overflow-x: clip; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  img, video { display: block; max-width: 100%; }
+  a { color: inherit; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
+  h1, h2, h3 { margin: 0; letter-spacing: -.03em; line-height: 1.08; font-weight: 600; }
+  h2 { font-size: clamp(30px, 3.6vw, 46px); max-width: 18em; }
+  h3 { font-size: 21px; letter-spacing: -.015em; line-height: 1.25; }
+  p { margin: 0; }
+  .lede { color: var(--text-2); max-width: 60ch; margin-top: 16px; }
+  .mono { font-family: var(--mono); }
+  section { padding: 104px 0; }
+  .head { margin-bottom: 44px; }
+
+  /* nav */
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(11,11,13,.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; height: 64px; gap: 30px; }
+  .brand { font-weight: 700; font-size: 19px; letter-spacing: -.02em; text-decoration: none; }
+  nav .links { display: flex; gap: 26px; margin-left: auto; }
+  nav .links a { color: var(--text-2); text-decoration: none; font-size: 15px; transition: color .2s; }
+  nav .links a:hover { color: var(--text); }
+
+  /* buttons */
+  .btn { display: inline-flex; align-items: center; gap: 9px; height: 46px; padding: 0 20px; border-radius: var(--r-s); border: 1px solid var(--line-2);
+         background: transparent; color: var(--text); font: 500 15.5px var(--sans); text-decoration: none; cursor: pointer; white-space: nowrap;
+         transition: transform .2s var(--ease), background .2s, border-color .2s; }
+  .btn:hover { border-color: #55555f; background: rgba(255,255,255,.04); }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .btn.primary:hover { background: #f7b266; border-color: #f7b266; }
+  .btn.sm { height: 36px; padding: 0 14px; font-size: 14px; }
+  .btn img { width: 17px; height: 17px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* hero: copy left, real studio screenshot bleeding off the right edge */
+  .hero { padding: 76px 0 0; }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 56px; align-items: center; }
+  .eyebrow { font: 500 13px var(--mono); color: var(--accent); letter-spacing: .04em; }
+  h1 { font-size: clamp(38px, 4.3vw, 60px); margin-top: 18px; max-width: 11em; }
+  .hero p { color: var(--text-2); font-size: 19px; max-width: 30em; margin-top: 22px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+  .shot { border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; background: var(--bg-2); box-shadow: 0 40px 90px -30px rgba(0,0,0,.9); }
+  .hero .shot-wrap { width: 150%; perspective: 1800px; }
+  .hero .shot img { width: 100%; height: auto; aspect-ratio: 2160 / 1350; }
+
+  /* live engine */
+  .demo { border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; background: var(--bg-2); }
+  .demo-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .demo-bar .lbl { color: var(--muted); font: 13px var(--mono); margin-right: 4px; }
+  .demo-bar .sp { flex: 1; }
+  .chip { height: 34px; padding: 0 13px; border-radius: var(--r-s); border: 1px solid var(--line-2); background: transparent; color: var(--text-2); font: 14px var(--sans); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
+  .chip:hover { color: var(--text); border-color: #55555f; }
+  .chip[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .stage { position: relative; height: min(80vh, 760px); min-height: 480px; }
   .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .stage .poster { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px;
-                   background: radial-gradient(60% 60% at 50% 40%, rgba(91,124,250,.18), transparent 70%); }
-  .poster p { color: var(--text-2); max-width: 30em; margin: 10px auto 20px; font-size: 15px; }
-  .stats { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-  .stat b { display: block; font-size: 32px; letter-spacing: -.02em; }
-  .stat span { color: var(--text-2); font-size: 14px; }
-  .note { color: var(--muted); font-size: 13.5px; margin-top: 16px; max-width: 46em; }
-  .code { background: #0d0d10; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font: 13.5px/1.7 var(--mono); overflow-x: auto; color: #cfd2e0; }
-  .code .c { color: var(--muted); }
-  .links { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 20px; }
-  .links a { display: block; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
-  .links a:hover { border-color: var(--accent); text-decoration: none; }
-  .links small { display: block; color: var(--text-2); font-size: 13px; }
-  .links .path { font: 13px var(--mono); color: var(--accent-h); }
-  footer { border-top: 1px solid var(--border); padding: 28px 0 48px; color: var(--muted); font-size: 14px; }
-  @media (max-width: 640px) { nav a.l { display: none; } .hero { padding-top: 56px; } }
+  .poster { position: absolute; inset: 0; border: 0; padding: 0; cursor: pointer; background: #08080a; }
+  .poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .28; transition: opacity .4s; }
+  .poster:hover img { opacity: .4; }
+  .poster .go { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .poster .go small { display: block; color: var(--text); text-shadow: 0 1px 12px #000; font: 14px var(--sans); margin-top: 14px; }
+
+  /* pipeline diagram */
+  .diagram { border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-2); padding: 28px; overflow-x: auto; }
+  .diagram svg { display: block; width: 100%; min-width: 900px; height: auto; }
+  .diagram .n rect { fill: var(--surface); stroke: var(--line-2); }
+  .diagram .n.a rect { stroke: var(--accent); fill: #19150f; }
+  .diagram .n.d rect { stroke-dasharray: 5 5; fill: transparent; }
+  .diagram .t { font: 600 16px var(--sans); fill: var(--text); }
+  .diagram .s { font: 12px var(--mono); fill: var(--text-2); }
+  .diagram .l { font: 11.5px var(--mono); fill: var(--muted); }
+  .diagram .e { stroke: #6a6a76; stroke-width: 1.5; fill: none; }
+  .diagram .e.a { stroke: var(--accent); }
+  .diagram .e.f { stroke-dasharray: 6 6; }
+  .legend { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 18px; color: var(--text-2); font-size: 14.5px; }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line-2); vertical-align: -2px; margin-right: 8px; }
+  .legend .la { border-color: var(--accent); background: #19150f; }
+  .legend .ld { border-style: dashed; }
+
+  /* what the Spotter sees: one large frame, two stacked */
+  .frames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .frames figure { margin: 0; }
+    .frames .ph { border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; }
+  .frames img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+  figcaption { color: var(--text-2); font-size: 14.5px; margin-top: 10px; max-width: 52ch; }
+  figcaption code { font: 13px var(--mono); color: var(--text); }
+
+  /* a real run */
+  .run { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; align-items: center; }
+  .run video { width: 100%; border-radius: var(--r); border: 1px solid var(--line-2); background: #000; aspect-ratio: 4 / 3; }
+  .facts { display: grid; grid-template-columns: repeat(3, auto); gap: 28px; margin-top: 32px; justify-content: start; }
+  .facts b { display: block; font: 600 34px var(--sans); letter-spacing: -.03em; }
+  .facts span { color: var(--text-2); font-size: 14.5px; }
+
+  /* research bento: 5 items, 5 cells */
+  .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
+  .cell { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 28px; overflow: hidden; }
+  .cell p { color: var(--text-2); font-size: 15.5px; margin-top: 10px; max-width: 54ch; }
+  .c-axis { grid-column: span 4; }
+  .c-arms { grid-column: span 2; grid-row: span 2; padding: 0; display: flex; flex-direction: column; background: #5b5d66; }
+  .c-arms img { width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: 50% 40%; }
+  .c-arms div { padding: 22px 26px 26px; background: var(--surface); }
+  .c-lib, .c-adv { grid-column: span 2; }
+  .c-web { grid-column: span 6; display: grid; grid-template-columns: 5fr 7fr; gap: 0; padding: 0; }
+  .c-web > div { padding: 34px 30px; align-self: center; }
+  .c-web img { width: 100%; height: 100%; max-height: 330px; object-fit: cover; object-position: 50% 45%; }
+  pre.recipe { margin: 20px 0 0; padding: 16px 18px; border-radius: var(--r-s); background: #0c0c0f; border: 1px solid var(--line); font: 13px/1.75 var(--mono); color: #cdd0dc; overflow-x: auto; }
+  pre.recipe .k { color: var(--accent); }
+  pre.recipe .c { color: var(--muted); }
+
+  /* results */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 16px; }
+  .tbl th { text-align: left; font: 500 13px var(--mono); color: var(--muted); padding: 0 16px 14px 0; border-bottom: 1px solid var(--line-2); }
+  .tbl td { padding: 20px 16px 20px 0; border-bottom: 1px solid var(--line); }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl td.num, .tbl th.num { text-align: right; font-family: var(--mono); padding-right: 0; padding-left: 16px; }
+  .tbl td.win { color: var(--accent); font-family: var(--mono); }
+  .tblwrap { overflow-x: auto; }
+  .caveat { color: var(--muted); font-size: 14.5px; margin-top: 26px; max-width: 78ch; }
+
+  /* code */
+  .code { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: start; }
+  .paths { margin-top: 30px; display: grid; gap: 2px; }
+  .paths a { display: grid; grid-template-columns: 11.5em 1fr; gap: 14px; padding: 13px 0; text-decoration: none; border-top: 1px solid var(--line); color: var(--text-2); font-size: 15px; transition: color .2s; }
+  .paths a:hover { color: var(--text); }
+  .paths a code { font: 14px var(--mono); color: var(--accent); }
+  pre.term { margin: 0; padding: 24px 26px; border-radius: var(--r); background: var(--bg-2); border: 1px solid var(--line); font: 14px/1.85 var(--mono); color: #d6d8e2; overflow-x: auto; }
+  pre.term .c { color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); padding: 32px 0 56px; color: var(--muted); font-size: 14.5px; }
+  footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
+  footer a { color: var(--text-2); }
+
+
+  /* ---------- motion. Everything below is gated on prefers-reduced-motion: no-preference. ---------- */
+  .progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: 0 50%; z-index: 20; pointer-events: none; }
+  nav .links a { position: relative; }
+  nav .links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 1px; background: var(--accent); transform: scaleX(0); transform-origin: 0 50%; transition: transform .35s var(--ease); }
+  nav .links a:hover::after { transform: scaleX(1); }
+  .cell { position: relative; transition: border-color .3s, transform .5s var(--ease); }
+  .cell::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s;
+                 background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(240,160,75,.11), transparent 62%); }
+  .cell:hover { border-color: #3d3d47; }
+  .cell:hover::after { opacity: 1; }
+  .frames .ph img, .c-arms img, .c-web img { transition: transform 1.2s var(--ease); }
+  .frames figure:hover img, .c-arms:hover img, .c-web:hover img { transform: scale(1.035); }
+  .pulses path { fill: none; stroke: #ffd29b; stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .16 1; stroke-dashoffset: .16; opacity: 0; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* reading progress, driven by the scroll position itself (no scroll listeners) */
+    @supports (animation-timeline: scroll()) {
+      .progress { animation: grow linear both; animation-timeline: scroll(root); }
+      @keyframes grow { to { transform: scaleX(1); } }
+      /* the hero screenshot starts tilted toward the reader and settles flat as the page moves on to the live demo */
+      .hero .shot { animation: settle linear both; animation-timeline: scroll(root); animation-range: 0 620px; transform-origin: 0 50%; }
+      @keyframes settle { from { transform: rotateY(-13deg) rotateX(5deg) translateZ(0); } to { transform: rotateY(0) rotateX(0) translateY(-18px); } }
+    }
+
+    /* headline: words rise out of a mask, in reading order */
+    h1 .w { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .08em; margin-bottom: -.08em; }
+    h1 .w > span { display: inline-block; transform: translateY(105%); animation: word .9s var(--ease) calc(.05s * var(--i) + .1s) both; }
+    @keyframes word { to { transform: none; } }
+    .hero .copy > h1 { animation: none; }
+    .hero .shot-wrap { animation: rise 1.2s var(--ease) .25s both; }
+
+    /* grouped reveals arrive one after another */
+    .rv { transition-delay: calc(var(--s, 0) * 90ms); }
+    .frames .ph { clip-path: inset(0 0 100% 0 round 14px); transition: clip-path 1.1s var(--ease) calc(var(--s, 0) * 120ms + 80ms); }
+    .frames .rv.in .ph { clip-path: inset(0 0 0 0 round 14px); }
+    .frames .ph img { transform: scale(1.12); }
+    .frames .rv.in .ph img { transform: scale(1); }
+    .frames figure.in:hover img { transform: scale(1.035); }
+    .tbl tbody tr { opacity: 0; transform: translateY(14px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: calc(var(--s, 0) * 110ms + 150ms); }
+    .rv.in .tbl tbody tr { opacity: 1; transform: none; }
+
+    /* diagram: boxes appear in pipeline order, the wiring draws itself, then signals keep flowing */
+    .diagram .n { opacity: 0; transform: translateY(10px); transform-box: fill-box; transition: opacity .6s var(--ease), transform .6s var(--ease); transition-delay: calc(var(--i) * 70ms); }
+    .diagram.in .n { opacity: 1; transform: none; }
+    .diagram .e[pathLength] { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset .9s var(--ease), opacity .2s; transition-delay: calc(var(--i) * 90ms + 500ms); }
+    .diagram.in .e[pathLength] { stroke-dashoffset: 0; opacity: 1; }
+    .diagram .e.f, .diagram .l { opacity: 0; transition: opacity .8s 1.7s; }
+    .diagram.in .e.f, .diagram.in .l { opacity: 1; }
+    .diagram.in .e.f { animation: march 1.2s linear infinite; }
+    @keyframes march { to { stroke-dashoffset: -24; } }
+    .diagram.in .pulses path { animation: flow 5.2s linear calc(var(--d) + 2.2s) infinite; }
+    @keyframes flow { 0% { stroke-dashoffset: .16; opacity: 0; } 2% { opacity: 1; } 11% { opacity: 1; } 13%, 100% { stroke-dashoffset: -1; opacity: 0; } }
+    .diagram.in .n.a rect { animation: think 5.2s ease-in-out 2.2s infinite; }
+    @keyframes think { 0%, 30%, 100% { fill: #19150f; } 12% { fill: #2a2012; } }
+  }
+
+  /* scroll reveal (storytelling: sections arrive as you reach them). Off under reduced motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .rv { opacity: 0; transform: translateY(22px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
+    .rv.in { opacity: 1; transform: none; }
+    .hero .copy > * { animation: rise .9s var(--ease) both; }
+    .hero .copy > :nth-child(2) { animation-delay: .06s; } .hero .copy > :nth-child(3) { animation-delay: .12s; } .hero .copy > :nth-child(4) { animation-delay: .18s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(26px); } }
+  }
+
+  @media (max-width: 900px) {
+    body { font-size: 16px; }
+    .wrap { padding: 0 18px; }
+    section { padding: 68px 0; }
+    nav .links { display: none; }
+    nav .btn { margin-left: auto; }
+    .hero { padding-top: 44px; }
+    .hero-grid, .run, .code { grid-template-columns: 1fr; gap: 34px; }
+    .hero .shot-wrap { width: 100%; }
+    .frames { grid-template-columns: 1fr; gap: 28px; }
+    .bento { grid-template-columns: 1fr; }
+    .c-axis, .c-arms, .c-lib, .c-adv, .c-web { grid-column: auto; grid-row: auto; }
+    .c-arms img { max-height: 340px; }
+    .c-web { grid-template-columns: 1fr; }
+    .facts { gap: 20px; }
+    .facts b { font-size: 28px; }
+    .paths a { grid-template-columns: 1fr; gap: 2px; }
+    .stage { height: 78vh; }
+  }
 </style>
 </head>
 <body>
 
+<div class="progress" aria-hidden="true"></div>
 <nav><div class="wrap">
-  <span class="brand">Dooms</span><span class="sp"></span>
-  <a class="l" href="#engine">Engine</a><a class="l" href="#how">How it works</a><a class="l" href="#research">Research</a><a class="l" href="#code">Code</a>
-  <a class="btn sm" href="https://github.com/jay7828/Dooms-inference" rel="noopener">GitHub</a>
+  <a class="brand" href="/">Dooms</a>
+  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#research">Research</a><a href="#results">Results</a></div>
+  <a class="btn sm" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><img src="https://cdn.simpleicons.org/github/f1f1f3" alt="">View on GitHub</a>
 </div></nav>
 
-<header class="hero"><div class="wrap">
-  <div class="eyebrow">Research · language-driven manipulation</div>
-  <h1>Tell a robot what to do. Watch four agents work it out.</h1>
-  <p class="lead">Dooms turns one sentence and one depth image into controller skills a robot arm can run. The planner, the physics and the vision all run inside your browser tab, so there is nothing to install and no server to wait for.</p>
-  <div class="cta">
-    <a class="btn primary" href="#engine" id="hero-run">Run it now</a>
-    <a class="btn" href="https://github.com/jay7828/Dooms-inference" rel="noopener">View the code</a>
-    <a class="btn" href="/static/studio.html">Open the full studio</a>
+<header class="hero"><div class="wrap hero-grid">
+  <div class="copy">
+    <div class="eyebrow">Open research in robot manipulation</div>
+    <h1 id="h1">One sentence in. A working robot plan out.</h1>
+    <p>Four Claude agents turn a command and a depth image into controller skills, then a physics simulation runs them in your browser.</p>
+    <div class="cta">
+      <a class="btn primary" href="#engine">Run the demo</a>
+      <a class="btn" href="https://github.com/jay7828/Dooms-inference" rel="noopener">View on GitHub</a>
+    </div>
   </div>
+  <div class="shot-wrap"><div class="shot"><img src="/static/landing/studio.jpg" width="2160" height="1350" alt="The Dooms studio mid-run: a Franka Panda arm lifting a bottle, with the plan and controller recipe beside it"></div></div>
 </div></header>
 
 <section id="engine"><div class="wrap">
-  <h2>The engine, live</h2>
-  <p class="sub">A real MuJoCo simulation of a Franka Panda, compiled to WebAssembly. Pick a command and press run: the demo planner needs no account. Switch to the Claude planner inside the studio to use your own AWS Bedrock credentials.</p>
-  <div class="demo">
+  <div class="head rv">
+    <h2>Try the engine. Nothing to install.</h2>
+    <p class="lede">This is MuJoCo compiled to WebAssembly, driving a Franka Panda in a web worker on your machine. The built-in demo planner needs no account.</p>
+  </div>
+  <div class="demo rv">
     <div class="demo-bar">
-      <span class="tag">command</span>
-      <button class="btn sm" data-scene="put_cube_in_box">Cube → box</button>
-      <button class="btn sm" data-scene="stack_cubes">Stack the cubes</button>
-      <button class="btn sm" data-scene="put_bottle_in_box">Bottle → box</button>
-      <span class="grow"></span>
-      <a class="btn sm" href="/static/studio.html">Full screen ↗</a>
+      <span class="lbl">task</span>
+      <button class="chip" data-scene="put_cube_in_box" aria-pressed="true">Put the cube in the box</button>
+      <button class="chip" data-scene="stack_cubes" aria-pressed="false">Stack the cubes</button>
+      <button class="chip" data-scene="put_bottle_in_box" aria-pressed="false">Put the bottle in the box</button>
+      <span class="sp"></span>
+      <a class="btn sm" href="/static/studio.html">Open the studio</a>
     </div>
     <div class="stage" id="stage">
-      <div class="poster" id="poster"><div>
-        <div class="eyebrow">simulator · runs locally</div>
-        <p>About 10 MB of physics and robot models load on first run, then they are cached by your browser.</p>
-        <button class="btn primary" id="go">Run the demo</button>
-      </div></div>
+      <button class="poster" id="poster" aria-label="Run the demo">
+        <img src="/static/landing/franka.jpg" alt="" loading="lazy">
+        <span class="go"><span class="btn primary">Run the demo</span><small>Loads about 10 MB of physics and robot models, then your browser caches them.</small></span>
+      </button>
     </div>
   </div>
 </div></section>
 
-<section id="how"><div class="wrap">
-  <h2>How a sentence becomes motion</h2>
-  <p class="sub">Four narrow agents, each doing one job, hand off to a controller stack that runs at control rate. Nothing is a single giant prompt.</p>
-  <div class="grid">
-    <div class="card step"><span class="no">01</span><div class="nm">Scout</div><p>Looks at the scene, notes what state each object is in (upright, fallen, blocked) and splits the task into ordered subtasks, or says plainly that the task cannot be done.</p></div>
-    <div class="card step"><span class="no">02</span><div class="nm">Composer</div><p>For each subtask, reuses a stored skill or writes a new recipe from five controller types, naming the keypoints it needs.</p></div>
-    <div class="card step"><span class="no">03</span><div class="nm">Tuner</div><p>Chooses the numbers: heights, force limits, widths, with the values that worked before offered as hints.</p></div>
-    <div class="card step"><span class="no">04</span><div class="nm">Spotter</div><p>Finds each keypoint in the image, refines it with a zoomed look, and lifts it to 3D with depth and a fitted surface normal.</p></div>
+<section id="pipeline"><div class="wrap">
+  <div class="head rv">
+    <h2>Four small agents instead of one large prompt</h2>
+    <p class="lede">Each agent has one job and a typed output. Their answers compile into a stack of task-axis controllers that runs at control rate, with no model in the loop.</p>
+  </div>
+  <div class="diagram rv" id="diagram">
+    <svg viewBox="0 0 1180 540" role="img" aria-label="Pipeline diagram: a sentence and a camera frame go to the Scout, Composer, Tuner and Spotter agents, whose outputs are compiled into a controller stack that drives the arm. Failures loop back to the Scout.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#6a6a76"/></marker>
+        <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#f0a04b"/></marker>
+      </defs>
+
+      <!-- edges -->
+      <path style="--i:1" pathLength="1" class="e" d="M200 182H258" marker-end="url(#ah)"/>
+      <path style="--i:2" pathLength="1" class="e" d="M200 392H230V206H258" marker-end="url(#ah)"/>
+      <path style="--i:3" pathLength="1" class="e" d="M200 412H498" marker-end="url(#ah)"/>
+      <path style="--i:4" pathLength="1" class="e a" d="M440 182H498" marker-end="url(#aa)"/>
+      <path style="--i:5" pathLength="1" class="e a" d="M680 182H738" marker-end="url(#aa)"/>
+      <path style="--i:6" pathLength="1" class="e a" d="M590 226V368" marker-end="url(#aa)"/>
+      <path style="--i:7" pathLength="1" class="e" d="M590 76V138" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <path style="--i:8" pathLength="1" class="e a" d="M920 182H978" marker-end="url(#aa)"/>
+      <path style="--i:9" pathLength="1" class="e a" d="M680 412H950V206H978" marker-end="url(#aa)"/>
+      <path style="--i:10" pathLength="1" class="e" d="M1070 226V288" marker-end="url(#ah)"/>
+      <path style="--i:11" pathLength="1" class="e" d="M1070 374V436" marker-end="url(#ah)"/>
+      <path style="--i:12" class="e f" d="M980 498H350V228" marker-end="url(#ah)"/>
+
+
+      <!-- signal pulses: the order information moves through the pipeline -->
+      <g class="pulses" aria-hidden="true">
+        <path style="--d:0s" pathLength="1" d="M200 182H258"/>
+        <path style="--d:.5s" pathLength="1" d="M440 182H498"/>
+        <path style="--d:1s" pathLength="1" d="M680 182H738"/>
+        <path style="--d:1s" pathLength="1" d="M590 226V368"/>
+        <path style="--d:1.5s" pathLength="1" d="M920 182H978"/>
+        <path style="--d:1.6s" pathLength="1" d="M680 412H950V206H978"/>
+        <path style="--d:2.3s" pathLength="1" d="M1070 226V288"/>
+        <path style="--d:2.8s" pathLength="1" d="M1070 374V436"/>
+      </g>
+      <!-- edge labels -->
+      <text class="l" x="600" y="302">keypoints it needs</text>
+      <text class="l" x="600" y="112">reuse / store</text>
+      <text class="l" x="712" y="402">3D points + surface normals</text>
+      <text class="l" x="520" y="488">subtask failed: look again, then replan</text>
+      <text class="l" x="1082" y="264">grounded skill</text>
+      <text class="l" x="1082" y="412">joint commands</text>
+
+      <!-- inputs -->
+      <g style="--i:1" class="n"><rect x="20" y="140" width="180" height="84" rx="10"/><text class="t" x="38" y="174">A sentence</text><text class="s" x="38" y="198">"put the bottle</text><text class="s" x="38" y="214"> into the box"</text></g>
+      <g style="--i:2" class="n"><rect x="20" y="370" width="180" height="84" rx="10"/><text class="t" x="38" y="404">Camera frame</text><text class="s" x="38" y="428">RGB + depth,</text><text class="s" x="38" y="444">camera pose</text></g>
+
+      <!-- agents -->
+      <g style="--i:3" class="n a"><rect x="260" y="140" width="180" height="84" rx="10"/><text class="t" x="278" y="174">Scout</text><text class="s" x="278" y="198">reads the scene,</text><text class="s" x="278" y="214">splits the task</text></g>
+      <g style="--i:4" class="n a"><rect x="500" y="140" width="180" height="84" rx="10"/><text class="t" x="518" y="174">Composer</text><text class="s" x="518" y="198">picks controllers</text><text class="s" x="518" y="214">for each subtask</text></g>
+      <g style="--i:5" class="n a"><rect x="740" y="140" width="180" height="84" rx="10"/><text class="t" x="758" y="174">Tuner</text><text class="s" x="758" y="198">sets heights,</text><text class="s" x="758" y="214">forces, widths</text></g>
+      <g style="--i:6" class="n a"><rect x="500" y="370" width="180" height="84" rx="10"/><text class="t" x="518" y="404">Spotter</text><text class="s" x="518" y="428">points in the image,</text><text class="s" x="518" y="444">lifts to 3D</text></g>
+
+      <!-- memory -->
+      <g style="--i:7" class="n d"><rect x="500" y="14" width="180" height="60" rx="10"/><text class="t" x="518" y="42">Skill library</text><text class="s" x="518" y="60">recipes that worked</text></g>
+
+      <!-- deterministic -->
+      <g style="--i:8" class="n"><rect x="980" y="140" width="180" height="84" rx="10"/><text class="t" x="998" y="174">Compiler</text><text class="s" x="998" y="198">checks clearance,</text><text class="s" x="998" y="214">orders by priority</text></g>
+      <g style="--i:9" class="n"><rect x="980" y="290" width="180" height="84" rx="10"/><text class="t" x="998" y="324">Controller stack</text><text class="s" x="998" y="348">null-space projection,</text><text class="s" x="998" y="364">every control tick</text></g>
+      <g style="--i:10" class="n"><rect x="980" y="438" width="180" height="84" rx="10"/><text class="t" x="998" y="472">The arm</text><text class="s" x="998" y="496">MuJoCo in WASM,</text><text class="s" x="998" y="512">or a real SO-101</text></g>
+    </svg>
+  </div>
+  <div class="legend rv"><span><i class="la"></i>Claude agent with a typed output</span><span><i></i>Deterministic code</span><span><i class="ld"></i>Memory that persists between runs</span></div>
+</div></section>
+
+<section id="vision"><div class="wrap">
+  <div class="head rv">
+    <h2>What the Spotter actually sees</h2>
+    <p class="lede">These are unedited frames from recorded runs. The red rings are where Claude pointed; depth and a plane fit turn each one into a 3D target.</p>
+  </div>
+  <div class="frames">
+    <figure class="rv"><div class="ph"><img src="/static/landing/ground-fallen.jpg" width="640" height="480" loading="lazy" alt="Simulator camera frame: a bottle lying on its side against a box, with keypoints marked on the bottle and on an empty patch of table"></div>
+      <figcaption>A knocked-over bottle. The Composer asked for a keypoint that exists in no object list, <code>table_free_spot</code>, and the Spotter found one.</figcaption></figure>
+    <figure class="rv"><div class="ph"><img src="/static/landing/ground-upright.jpg" width="640" height="480" loading="lazy" alt="Simulator camera frame: an upright bottle and an open box with a grasp point and a placement point marked"></div>
+      <figcaption>The easy case: a grasp point on the bottle and a drop point inside the box.</figcaption></figure>
+    <figure class="rv"><div class="ph"><img src="/static/landing/ground-blocked.jpg" width="640" height="480" loading="lazy" alt="Simulator camera frame after the bottle has been moved: keypoints re-grounded from the new scene"></div>
+      <figcaption>Later in the same run the bottle has moved, so the scene is grounded again from a fresh frame.</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="run"><div class="wrap run">
+  <video class="rv" src="/static/landing/run-bottle.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Recording of a simulated Franka arm putting a bottle into a box"></video>
+  <div class="rv">
+    <h2>A recorded run, planned by Claude</h2>
+    <p class="lede">Claude Sonnet 4.5 on Amazon Bedrock, from the instruction "put the bottle into the box" to a bottle in the box, with no replans.</p>
+    <div class="facts">
+      <div><b data-n="8">8</b><span>model calls</span></div>
+      <div><b data-n="0.13" data-pre="$" data-dp="2">$0.13</b><span>Bedrock cost</span></div>
+      <div><b data-n="6.4" data-post=" s" data-dp="1">6.4 s</b><span>of robot motion</span></div>
+    </div>
   </div>
 </div></section>
 
 <section id="research"><div class="wrap">
-  <h2>What we have learned</h2>
-  <p class="sub">The pieces of this project that are research rather than plumbing.</p>
-  <div class="grid">
-    <div class="card"><h3>Task-axis control</h3><p>Behaviour is expressed as aligning axes between keypoints (position, axis, yaw, force, gripper), stacked by priority with exact null-space projection, instead of free-form joint trajectories.</p></div>
-    <div class="card"><h3>Coarse-to-fine grounding</h3><p>A grasp needs the target to about 5 mm. Pointing, a zoom pass, depth lift, then a wrist-camera close-up before reaching. Failures first try re-looking; only then a full replan.</p></div>
-    <div class="card"><h3>A skill library that grows</h3><p>Successful recipes are stored with roles instead of object names and reused later, along with the parameters that worked. Each arm keeps its own library.</p></div>
-    <div class="card"><h3>Reasoning about obstacles</h3><p>A depth-based clearance check tells the planner when open fingers would hit a neighbour, and it can decide to push the box aside before the original task.</p></div>
-    <div class="card"><h3>Typed decision advisor</h3><p>Two small calls, "did the subtask succeed" and "which recovery", can be answered by a typed-decision model with a confidence, falling back to rules when unsure.</p></div>
-    <div class="card"><h3>Inference in the browser</h3><p>The whole stack was ported to TypeScript and a web worker. Claude is called straight from the page with the visitor's own AWS credentials; skills live in IndexedDB.</p></div>
+  <div class="head rv">
+    <h2>What we are studying</h2>
   </div>
-
-  <h2 style="margin-top:48px">Results so far</h2>
-  <div class="stats">
-    <div class="stat card"><b>15 / 15</b><span>episodes solved with live Claude Sonnet 4.5 (5 seeds × 3 tasks)</span></div>
-    <div class="stat card"><b>≈ 8</b><span>model calls per episode</span></div>
-    <div class="stat card"><b>≈ $0.11</b><span>per episode on Bedrock</span></div>
-    <div class="stat card"><b>2 arms</b><span>Franka Panda and SO-ARM101</span></div>
+  <div class="bento">
+    <div class="cell c-axis rv">
+      <h3>Behaviour as aligned axes, not trajectories</h3>
+      <p>A skill is a short list of controllers, each aligning one point or axis with another. The agents write this; the runtime stacks it by priority.</p>
+<pre class="recipe"><span class="c"># "Lift the bottle up", as the studio shows it</span>
+[p1] <span class="k">PosAlign</span>(bottle_cap, bottle_cap, axis=x, o_x=0)
+[p1] <span class="k">PosAlign</span>(bottle_cap, bottle_cap, axis=y, o_y=0)
+[p1] <span class="k">PosAlign</span>(bottle_cap, bottle_cap, axis=z, o_z=0.2)   <span class="c"># 20 cm above the grasp</span>
+[p2] <span class="k">AxisAlign</span>(eef_z, bottle_cap_normal, o_theta=180)        <span class="c"># gripper stays vertical</span></pre>
+    </div>
+    <div class="cell c-arms rv">
+      <img src="/static/landing/so101.jpg" width="900" height="1061" loading="lazy" alt="A yellow SO-ARM101 hobby arm lowering a red cube into a box in the simulator">
+      <div><h3>Two very different arms</h3><p>A 7-joint Franka Panda and the 5-joint SO-ARM101, which has no force sensor. Same pipeline, a different robot profile.</p></div>
+    </div>
+    <div class="cell c-lib rv">
+      <h3>A skill library that grows</h3>
+      <p>Recipes that succeed are stored by role, not by object name, and offered again with the numbers that worked.</p>
+    </div>
+    <div class="cell c-adv rv">
+      <h3>Recovery before replanning</h3>
+      <p>A failed subtask first triggers a second look at the scene. Only if that fails does the Scout plan again from where things now lie.</p>
+    </div>
+    <div class="cell c-web rv">
+      <div><h3>Inference moved into the browser</h3><p>The Python stack was ported to TypeScript and a web worker. Claude is called from the page with your own AWS credentials, and skills are kept in IndexedDB. Hosting is static files.</p></div>
+      <img src="/static/landing/franka.jpg" width="1400" height="1142" loading="lazy" alt="The in-browser 3D view of the Franka arm holding a bottle above the table">
+    </div>
   </div>
-  <p class="note">Simulation only, a small sample. The scripted stand-in planner with simulated pointing noise reaches 12/12, 12/12 and 11/12 on bottle→box, cube→box and stacking. The real SO-101 path is covered by tests and a virtual servo rig; no physical-hardware results are reported. The decision-advisor benchmark has not been completed, so there are no accuracy numbers for it yet.</p>
 </div></section>
 
-<section id="code"><div class="wrap">
-  <h2>Read the code</h2>
-  <p class="sub">Apache-2.0. Everything on this page, including the engine you just ran, is in one repository.</p>
-  <div class="code"><span class="c"># the whole project</span>
+<section id="results"><div class="wrap">
+  <div class="head rv">
+    <h2>Results so far</h2>
+    <p class="lede">Live Claude Sonnet 4.5 in simulation, five random seeds per task, averages per episode.</p>
+  </div>
+  <div class="tblwrap rv">
+    <table class="tbl">
+      <thead><tr><th>Task</th><th>Solved</th><th class="num">Model calls</th><th class="num">Cost</th><th class="num">Planning time</th><th class="num">Grounding error</th></tr></thead>
+      <tbody>
+        <tr><td>Put the bottle in the box</td><td class="win">5 / 5</td><td class="num">8.0</td><td class="num">$0.105</td><td class="num">47.2 s</td><td class="num">7.8 mm</td></tr>
+        <tr><td>Put the cube in the box</td><td class="win">5 / 5</td><td class="num">8.0</td><td class="num">$0.107</td><td class="num">47.1 s</td><td class="num">22.0 mm</td></tr>
+        <tr><td>Stack the cubes</td><td class="win">5 / 5</td><td class="num">8.0</td><td class="num">$0.104</td><td class="num">44.4 s</td><td class="num">5.8 mm</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caveat rv">Read these as an early check, not a benchmark claim. With 5 episodes per task the 95% interval on each success rate runs from 57% to 100%. Harder scenes (a fallen bottle, a blocked grasp) still fail some of the time. Nothing here was measured on physical hardware.</p>
+</div></section>
+
+<section id="code"><div class="wrap code">
+  <div class="rv">
+    <h2>All of it is open</h2>
+    <p class="lede">Apache-2.0, one repository: the engine you just ran, the Python reference stack and the benchmark harness.</p>
+    <div class="cta"><a class="btn primary" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><img src="https://cdn.simpleicons.org/github/1b1206" alt="">View on GitHub</a></div>
+    <div class="paths">
+      <a href="https://github.com/jay7828/Dooms-inference/tree/main/web/engine" rel="noopener"><code>web/engine</code><span>The browser engine: simulator, controllers, agents, Bedrock client</span></a>
+      <a href="https://github.com/jay7828/Dooms-inference/tree/main/src/dooms" rel="noopener"><code>src/dooms</code><span>Python reference implementation and real-robot drivers</span></a>
+      <a href="https://github.com/jay7828/Dooms-inference/blob/main/docs/ARCHITECTURE.md" rel="noopener"><code>docs/ARCHITECTURE.md</code><span>Design notes</span></a>
+    </div>
+  </div>
+<pre class="term rv"><span class="c"># get the code</span>
 git clone https://github.com/jay7828/Dooms-inference
 cd Dooms-inference
-<span class="c"># the browser engine</span>
+
+<span class="c"># build the browser engine</span>
 npm install &amp;&amp; npm run build
-<span class="c"># or the Python reference stack</span>
-uv venv .venv --python 3.11 &amp;&amp; uv pip install --python .venv/bin/python -e ".[dev]"
-.venv/bin/python scripts/run_task.py --task put_bottle_in_box --seed 0 --llm scripted</div>
-  <div class="links">
-    <a href="https://github.com/jay7828/Dooms-inference" rel="noopener"><span class="path">jay7828/Dooms-inference</span><small>Repository, README and benchmark scripts</small></a>
-    <a href="https://github.com/jay7828/Dooms-inference/tree/main/web/engine" rel="noopener"><span class="path">web/engine</span><small>The in-browser engine: simulator wrapper, controllers, agents, Bedrock client</small></a>
-    <a href="https://github.com/jay7828/Dooms-inference/tree/main/src/dooms" rel="noopener"><span class="path">src/dooms</span><small>The Python reference implementation and benchmark harness</small></a>
-    <a href="https://github.com/jay7828/Dooms-inference/blob/main/docs/ARCHITECTURE.md" rel="noopener"><span class="path">docs/ARCHITECTURE.md</span><small>Design notes</small></a>
-  </div>
+
+<span class="c"># or run the Python stack, no AWS needed</span>
+uv venv .venv --python 3.11
+uv pip install --python .venv/bin/python -e ".[dev]"
+.venv/bin/python scripts/run_task.py \
+    --task put_bottle_in_box --seed 0 --llm scripted</pre>
 </div></section>
 
-<footer><div class="wrap">Dooms · Apache-2.0 · Robot models from MuJoCo Menagerie and The Robot Studio SO-ARM100/101, under their own licences.</div></footer>
+<footer><div class="wrap">
+  <span>Dooms, released under Apache-2.0.</span>
+  <span>Robot models: <a href="https://github.com/google-deepmind/mujoco_menagerie" rel="noopener">MuJoCo Menagerie</a> and <a href="https://github.com/TheRobotStudio/SO-ARM100" rel="noopener">The Robot Studio SO-ARM100</a>.</span>
+</div></footer>
 
 <script>
-  const stage = document.getElementById("stage");
+  const stage = document.getElementById("stage"), chips = [...document.querySelectorAll(".chip")];
   let scene = "put_cube_in_box";
   function run(sc) {
     scene = sc || scene;
-    const src = `/static/studio.html?autorun=1&scene=${scene}&planner=scripted&grounding=oracle&speed=2`;
+    chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.scene === scene)));
     let f = stage.querySelector("iframe");
-    if (!f) { f = document.createElement("iframe"); f.title = "Dooms studio"; f.allow = "fullscreen"; stage.appendChild(f); }
-    f.src = src;
+    if (!f) { f = document.createElement("iframe"); f.title = "Dooms studio, running in your browser"; f.allow = "fullscreen"; stage.appendChild(f); }
+    f.src = `/static/studio.html?autorun=1&scene=${scene}&planner=scripted&grounding=oracle&speed=2`;
     document.getElementById("poster")?.remove();
   }
-  document.getElementById("go").onclick = () => run();
-  document.querySelectorAll("[data-scene]").forEach((b) => (b.onclick = () => run(b.dataset.scene)));
-  document.getElementById("hero-run").addEventListener("click", () => setTimeout(() => { if (!stage.querySelector("iframe")) document.getElementById("go").focus(); }, 400));
+  document.getElementById("poster").onclick = () => run();
+  chips.forEach((c) => (c.onclick = () => run(c.dataset.scene)));
+
+  const motion = matchMedia("(prefers-reduced-motion: no-preference)").matches;
+
+  // headline words (masked rise), built from the plain text so it stays readable without JS
+  if (motion) {
+    const h = document.getElementById("h1"), words = h.textContent.trim().split(/\s+/);
+    h.setAttribute("aria-label", h.textContent.trim());
+    h.innerHTML = words.map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${w}</span></span>`).join(" ");
+  }
+
+  // stagger siblings that reveal together
+  document.querySelectorAll(".frames, .bento, .tbl tbody").forEach((g) => [...g.children].forEach((el, i) => el.style.setProperty("--s", i)));
+
+  // numbers count up once, when they are first seen
+  function count(el) {
+    const end = +el.dataset.n, dp = +(el.dataset.dp || 0), pre = el.dataset.pre || "", post = el.dataset.post || "", t0 = performance.now(), dur = 1100;
+    (function tick(t) {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+      el.textContent = pre + (end * e).toFixed(dp) + post;
+      if (k < 1) requestAnimationFrame(tick);
+    })(t0);
+  }
+
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add("in"); io.unobserve(e.target);
+    if (motion) e.target.querySelectorAll("[data-n]").forEach(count);
+  }), { threshold: 0.14 });
+  document.querySelectorAll(".rv").forEach((el) => io.observe(el));
+
+  // the recorded run only plays while it is on screen
+  const vid = document.querySelector(".run video");
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) vid.play().catch(() => {}); else vid.pause(); }, { threshold: 0.3 }).observe(vid);
+  if (!motion) { vid.removeAttribute("autoplay"); vid.controls = true; vid.pause(); }
+
+  // cursor-following highlight on the research tiles
+  document.querySelectorAll(".cell").forEach((c) => c.addEventListener("pointermove", (e) => {
+    const r = c.getBoundingClientRect();
+    c.style.setProperty("--mx", e.clientX - r.left + "px"); c.style.setProperty("--my", e.clientY - r.top + "px");
+  }));
 </script>
 </body>
 </html>
