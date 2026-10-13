@@ -260,11 +260,12 @@ function showSceneState(ev) {
 
 /* ------------------------------------------------------------------ pipeline panel */
 const AGENTS = [
-  ["task_decomposer", "01", "Task Decomposer", "Reads the scene and splits the task"],
-  ["skill_generator", "02", "Skill Generator", "Reuses or creates controller skills"],
-  ["parameter_setter", "03", "Parameter Setter", "Chooses the numbers"],
-  ["vision_grounder", "04", "Vision Grounder", "Finds keypoints in 3D"],
+  ["task_decomposer", "01", "Scout", "Reads the scene and splits the task"],
+  ["skill_generator", "02", "Composer", "Reuses or creates controller skills"],
+  ["parameter_setter", "03", "Tuner", "Chooses the numbers"],
+  ["vision_grounder", "04", "Spotter", "Finds keypoints in 3D"],
 ];
+const AGENT_NAME = Object.fromEntries(AGENTS.map(([k, , t]) => [k, t]));
 function buildAgents() {
   $("#agents").innerHTML = AGENTS.map(([k, n, t, d]) => `<div class="agent" data-a="${k}"><div class="agent-h"><span class="no">${n}</span><h4>${t}</h4><span class="status">Idle</span></div><div class="agent-b">${k === "vision_grounder" ? '<img id="groundimg" alt="Grounded keypoints"><div id="groundtxt"></div>' : ""}</div></div>`).join("");
 }
@@ -339,8 +340,8 @@ function handle(ev) {
       if (!ev.verified) logLine("No ground-truth check exists for this command", "w");
       break;
     case "status": setHud("···", ev.text); logLine(ev.text); break;
-    case "agent_start": setAgent(ev.agent, "run"); setHud("AI", `${ev.agent.replace(/_/g, " ")}…`); logLine(`→ ${ev.agent}${ev.label ? " (" + ev.label + ")" : ""}`); break;
-    case "agent_rejected": logLine(`${ev.agent} answer rejected, retrying: ${ev.reason}`, "w"); break;
+    case "agent_start": setAgent(ev.agent, "run"); setHud("AI", `${AGENT_NAME[ev.agent] || ev.agent}…`); logLine(`→ ${AGENT_NAME[ev.agent] || ev.agent}${ev.label ? " (" + ev.label + ")" : ""}`); break;
+    case "agent_rejected": logLine(`${AGENT_NAME[ev.agent] || ev.agent} answer rejected, retrying: ${ev.reason}`, "w"); break;
     case "agent": {
       setAgent(ev.agent, "done"); usage(ev.usage);
       const o = ev.output;

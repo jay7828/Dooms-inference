@@ -3,198 +3,184 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dooms</title>
+<title>Dooms · Research</title>
+<meta name="description" content="Dooms: language-driven robot manipulation. Four cooperating Claude agents turn a sentence and a depth image into controller skills, and the whole simulator runs in your browser.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<script type="importmap">
-{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
-</script>
-<link rel="stylesheet" href="/static/app.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c; --surface: #101013; --surface-2: #16161a; --border: #212127; --border-2: #2c2c34;
+    --text: #ececef; --text-2: #a1a1aa; --muted: #70707b; --accent: #5b7cfa; --accent-h: #6f8cff;
+    --accent-soft: rgba(91,124,250,.13); --ok: #3fb68b;
+    --sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent-h); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); font-size: .9em; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  nav { position: sticky; top: 0; z-index: 5; background: rgba(10,10,12,.82); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  nav .wrap { display: flex; align-items: center; gap: 22px; height: 56px; }
+  nav .brand { font-weight: 700; letter-spacing: .02em; color: var(--text); }
+  nav .sp { flex: 1; }
+  nav a.l { color: var(--text-2); font-size: 14px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border-2);
+         background: var(--surface-2); color: var(--text); font-weight: 500; font-size: 15px; cursor: pointer; }
+  .btn:hover { text-decoration: none; border-color: var(--muted); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-h); }
+  .btn.sm { padding: 6px 12px; font-size: 13px; }
+  .hero { padding: 88px 0 56px; }
+  .eyebrow { font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent-h); }
+  h1 { font-size: clamp(34px, 6vw, 60px); line-height: 1.05; letter-spacing: -.03em; margin: 14px 0 18px; max-width: 16em; }
+  .lead { color: var(--text-2); font-size: 19px; max-width: 40em; margin: 0 0 28px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  section { padding: 56px 0; border-top: 1px solid var(--border); }
+  h2 { font-size: 28px; letter-spacing: -.02em; margin: 0 0 8px; }
+  .sub { color: var(--text-2); margin: 0 0 28px; max-width: 42em; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0; color: var(--text-2); font-size: 14.5px; }
+  .no { font: 600 12px var(--mono); color: var(--accent-h); }
+  .step .nm { font-size: 20px; font-weight: 600; margin: 4px 0; }
+  .demo { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .demo-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .demo-bar .grow { flex: 1; }
+  .demo-bar .tag { font: 12px var(--mono); color: var(--muted); }
+  .stage { position: relative; height: min(78vh, 720px); min-height: 460px; background: #08080a; }
+  .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .stage .poster { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px;
+                   background: radial-gradient(60% 60% at 50% 40%, rgba(91,124,250,.18), transparent 70%); }
+  .poster p { color: var(--text-2); max-width: 30em; margin: 10px auto 20px; font-size: 15px; }
+  .stats { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+  .stat b { display: block; font-size: 32px; letter-spacing: -.02em; }
+  .stat span { color: var(--text-2); font-size: 14px; }
+  .note { color: var(--muted); font-size: 13.5px; margin-top: 16px; max-width: 46em; }
+  .code { background: #0d0d10; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font: 13.5px/1.7 var(--mono); overflow-x: auto; color: #cfd2e0; }
+  .code .c { color: var(--muted); }
+  .links { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 20px; }
+  .links a { display: block; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
+  .links a:hover { border-color: var(--accent); text-decoration: none; }
+  .links small { display: block; color: var(--text-2); font-size: 13px; }
+  .links .path { font: 13px var(--mono); color: var(--accent-h); }
+  footer { border-top: 1px solid var(--border); padding: 28px 0 48px; color: var(--muted); font-size: 14px; }
+  @media (max-width: 640px) { nav a.l { display: none; } .hero { padding-top: 56px; } }
+</style>
 </head>
 <body>
 
-<header class="topbar">
-  <div class="brand">
-    <div class="logo" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M5 20h6"/><path d="M8 20V12"/><path d="M8 12 15 6"/><path d="M15 6l4 3"/></svg></div>
-    Dooms
+<nav><div class="wrap">
+  <span class="brand">Dooms</span><span class="sp"></span>
+  <a class="l" href="#engine">Engine</a><a class="l" href="#how">How it works</a><a class="l" href="#research">Research</a><a class="l" href="#code">Code</a>
+  <a class="btn sm" href="https://github.com/jay7828/Dooms-inference" rel="noopener">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Research · language-driven manipulation</div>
+  <h1>Tell a robot what to do. Watch four agents work it out.</h1>
+  <p class="lead">Dooms turns one sentence and one depth image into controller skills a robot arm can run. The planner, the physics and the vision all run inside your browser tab, so there is nothing to install and no server to wait for.</p>
+  <div class="cta">
+    <a class="btn primary" href="#engine" id="hero-run">Run it now</a>
+    <a class="btn" href="https://github.com/jay7828/Dooms-inference" rel="noopener">View the code</a>
+    <a class="btn" href="/static/studio.html">Open the full studio</a>
   </div>
-  <span class="conn" id="conn" title="Connecting…"></span>
-  <span class="spacer"></span>
-  <button class="btn awsbtn" id="btn-aws" title="Use your own AWS account for Claude">
-    <svg class="i" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8"/><path d="m16 7 3 3"/></svg>
-    <span id="aws-label">Connect AWS</span><i class="dot"></i>
-  </button>
-</header>
+</div></header>
 
-<main class="layout">
-
-  <!-- command -->
-  <div class="col">
-    <section class="card scroll" style="flex:1">
-      <div class="card-b">
-        <textarea id="task" class="composer" rows="3" spellcheck="false" placeholder="What should the robot do?"></textarea>
-        <div class="chips" id="chips"></div>
-
-        <div class="prow">
-          <span class="pl">Robot</span>
-          <div class="seg auto" id="seg-robot"></div>
-        </div>
-        <div class="prow" id="row-mode" hidden>
-          <span class="pl">Mode</span>
-          <div class="seg auto" id="seg-mode"><button data-value="sim" class="on">Simulation</button><button data-value="real">Real robot</button></div>
-        </div>
-        <div class="callout" id="robot-hosted" hidden><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><div><b style="color:var(--text)">Use the desktop app</b><br><span id="robot-hosted-text"></span>
-          <div class="wiz-row" style="margin:6px 0 0"><a class="btn primary" id="robot-hosted-dl" target="_blank" rel="noopener" hidden>Get the desktop app</a><a class="btn" href="/static/guide/index.html" target="_blank" rel="noopener">Setup guide</a></div></div></div>
-        <div id="robot-bar" hidden>
-          <div class="rbar">
-            <i class="dot" id="rb-dot"></i><span class="rb-text" id="rb-text">Not connected</span><span class="spacer"></span>
-            <button class="btn" id="rb-setup" type="button">Set up</button>
-          </div>
-          <div class="rsteps" id="rb-steps"></div>
-          <div class="rtools" id="rb-tools" hidden>
-            <button class="btn" id="rb-torque" type="button" title="Switch the servos' torque on or off">Torque</button>
-            <button class="btn" id="rb-home" type="button" title="Move to the home pose">Home</button>
-            <button class="btn" id="rb-rest" type="button" title="Fold the arm and switch the torque off">Rest</button>
-            <span class="spacer"></span>
-            <button class="btn danger" id="rb-stop" type="button" title="Stop and hold the current pose">Stop</button>
-          </div>
-        </div>
-        <div class="prow">
-          <span class="pl">Scene</span>
-          <select class="sel" id="scene"></select>
-          <button class="btn icon" id="btn-reset" title="Reset scene"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M8 16H3v5"/></svg></button>
-        </div>
-        <div class="prow">
-          <span class="pl">Planner</span>
-          <div class="seg auto" id="seg-planner"><button data-value="scripted" class="on">Demo</button><button data-value="bedrock">Claude</button></div>
-        </div>
-        <div id="planner-note"></div>
-
-        <div class="prow foot">
-          <button class="link" id="opt-toggle" type="button">Options<svg class="i chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
-          <span class="scene-state" id="scene-state">fresh</span>
-          <span class="spacer"></span>
-          <button class="btn primary" id="run"><svg class="i" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg><span>Run</span></button>
-        </div>
-
-        <div id="options" hidden>
-          <div class="prow"><span class="pl">Grounding</span><div class="seg auto" id="seg-grounding"><button data-value="vlm" class="on">Vision</button><button data-value="oracle">Oracle</button></div></div>
-          <div class="prow"><span class="pl">Speed</span><div class="seg auto" id="seg-speed"><button data-value="0.5">0.5×</button><button data-value="1" class="on">1×</button><button data-value="2">2×</button><button data-value="4">4×</button><button data-value="0">Max</button></div></div>
-          <div class="prow"><span class="pl">Seed</span><input class="num" id="seed" type="number" min="0" step="1" value="0"><button class="btn icon" id="seed-dice" title="Random seed"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/></svg></button></div>
-          <div class="prow" id="row-dry" hidden><span class="pl">Dry run</span><label class="row" style="cursor:pointer;grid-column:2 / -1"><span class="switch"><input type="checkbox" id="dry-run"><i></i></span><span class="hint">plan and preview; the arm does not move</span></label></div>
-          <div class="prow"><span class="pl">Skills</span><label class="row" style="cursor:pointer;grid-column:2 / -1"><span class="switch"><input type="checkbox" id="skills" checked><i></i></span><span class="hint">learn &amp; reuse</span></label></div>
-        </div>
-      </div>
-    </section>
-  </div>
-
-  <!-- simulation -->
-  <div class="col">
-    <section class="card viewport">
-      <div class="vp-h"><b>Simulation</b><span class="spacer"></span><span class="t" id="pill-sim">t = 0.0 s</span></div>
-      <div class="stage" id="stage">
-        <canvas id="gl"></canvas>
-        <div class="overlay loading" id="loading"><span><i class="spin"></i>Loading scene</span></div>
-        <div class="overlay hud" id="hud"><span class="badge" id="hud-badge">01</span><span id="hud-text"></span></div>
-        <div class="overlay tools">
-          <button class="tool" id="btn-view" title="Reset view"><svg class="i" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
-          <button class="tool on" id="btn-pip" title="Agent camera"><svg class="i" viewBox="0 0 24 24"><path d="M14.5 4h-5L8 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
-        </div>
-        <div class="overlay pip" id="pip"><img id="frame" alt="Agent camera"></div>
-      </div>
-      <div class="stepper" id="stepper"></div>
-      <div class="result" id="result"></div>
-    </section>
-  </div>
-
-  <!-- agents -->
-  <div class="col">
-    <section class="card panel">
-      <div class="tabs" id="tabs">
-        <button class="tab on" data-pane="pipeline">Pipeline</button>
-        <button class="tab" data-pane="skills">Skills <span class="count" id="skill-count">0</span></button>
-        <button class="tab" data-pane="activity">Activity</button>
-      </div>
-      <div class="pane on" id="pane-pipeline">
-        <div class="obstacle" id="obstacle"><h4><svg class="i" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Obstacle</h4><div id="obstacle-body"></div></div>
-        <div id="agents"></div>
-      </div>
-      <div class="pane" id="pane-skills">
-        <div class="row" style="margin-bottom:8px"><span class="hint">Saved when a command succeeds.</span><span class="spacer"></span><button class="btn ghost" id="btn-clearskills">Clear</button></div>
-        <div id="skills-list"></div>
-      </div>
-      <div class="pane" id="pane-activity">
-        <div class="metrics">
-          <div class="metric"><div class="v" id="m-calls">–</div><div class="l">calls</div></div>
-          <div class="metric"><div class="v" id="m-cost">–</div><div class="l">cost</div></div>
-          <div class="metric"><div class="v" id="m-tok">–</div><div class="l">tokens</div></div>
-          <div class="metric"><div class="v" id="m-sim">–</div><div class="l">sim time</div></div>
-        </div>
-        <div class="log" id="log"></div>
-      </div>
-    </section>
-  </div>
-</main>
-
-<!-- AWS dialog -->
-<dialog class="modal" id="aws-modal">
-  <form method="dialog" id="aws-form" autocomplete="off">
-    <div class="modal-h"><h2>Connect AWS</h2><span class="spacer"></span>
-      <button type="button" class="btn ghost icon" id="aws-close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-    <div class="modal-b">
-      <p class="lead">Claude runs on Amazon Bedrock in your account and is billed to you.</p>
-      <div class="seg" id="aws-mode" style="margin-bottom:10px"><button type="button" data-value="keys" class="on">Access keys</button><button type="button" data-value="bearer">Bedrock API key</button></div>
-      <div id="mode-keys" style="display:grid;gap:8px">
-        <div><label class="label" for="aws-akid">Access key ID</label><input class="inp mono" id="aws-akid" placeholder="AKIA…" spellcheck="false" autocapitalize="off"></div>
-        <div><label class="label" for="aws-secret">Secret access key</label><div class="pw"><input class="inp mono" id="aws-secret" type="password" spellcheck="false" autocapitalize="off"><button type="button" class="btn ghost" data-toggle="aws-secret">Show</button></div></div>
-        <div><label class="label" for="aws-token">Session token <span style="font-weight:400">(optional)</span></label><div class="pw"><input class="inp mono" id="aws-token" type="password" spellcheck="false" autocapitalize="off"><button type="button" class="btn ghost" data-toggle="aws-token">Show</button></div></div>
-      </div>
-      <div id="mode-bearer" hidden>
-        <label class="label" for="aws-bearer">API key</label><div class="pw"><input class="inp mono" id="aws-bearer" type="password" placeholder="ABSK…" spellcheck="false" autocapitalize="off"><button type="button" class="btn ghost" data-toggle="aws-bearer">Show</button></div>
-      </div>
-      <div class="two">
-        <div><label class="label" for="aws-region">Region</label><select class="sel" id="aws-region"><option>us-east-1</option><option>us-west-2</option><option>us-east-2</option><option>eu-west-1</option><option>eu-central-1</option><option>ap-northeast-1</option><option>ap-southeast-2</option><option>ap-south-1</option></select></div>
-        <div><label class="label" for="aws-model">Model</label><select class="sel" id="aws-model"><option value="us.anthropic.claude-sonnet-4-5-20250929-v1:0">Sonnet 4.5</option></select></div>
-      </div>
-      <label class="row" style="margin-top:10px;font-size:12px;color:var(--text-2);cursor:pointer"><input type="checkbox" id="aws-remember"> Remember on this device</label>
-      <div class="vstatus" id="aws-status" role="status" aria-live="polite"></div>
-      <div class="secure"><svg class="i" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3z"/></svg><span>Kept in memory for your session and never written to disk or logs. Use an IAM user limited to Bedrock invoke.</span></div>
+<section id="engine"><div class="wrap">
+  <h2>The engine, live</h2>
+  <p class="sub">A real MuJoCo simulation of a Franka Panda, compiled to WebAssembly. Pick a command and press run: the demo planner needs no account. Switch to the Claude planner inside the studio to use your own AWS Bedrock credentials.</p>
+  <div class="demo">
+    <div class="demo-bar">
+      <span class="tag">command</span>
+      <button class="btn sm" data-scene="put_cube_in_box">Cube → box</button>
+      <button class="btn sm" data-scene="stack_cubes">Stack the cubes</button>
+      <button class="btn sm" data-scene="put_bottle_in_box">Bottle → box</button>
+      <span class="grow"></span>
+      <a class="btn sm" href="/static/studio.html">Full screen ↗</a>
     </div>
-    <div class="modal-f">
-      <button type="button" class="btn danger" id="aws-disconnect" hidden>Disconnect</button>
-      <span class="spacer"></span>
-      <button type="button" class="btn" id="aws-cancel">Cancel</button>
-      <button type="submit" class="btn primary" id="aws-validate" value="validate">Connect</button>
+    <div class="stage" id="stage">
+      <div class="poster" id="poster"><div>
+        <div class="eyebrow">simulator · runs locally</div>
+        <p>About 10 MB of physics and robot models load on first run, then they are cached by your browser.</p>
+        <button class="btn primary" id="go">Run the demo</button>
+      </div></div>
     </div>
-  </form>
-</dialog>
-
-<!-- real robot setup -->
-<dialog class="modal wide" id="robot-modal">
-  <div class="modal-h"><h2>Real robot · SO-101</h2><span class="rb-chip" id="rm-chip"></span><span class="spacer"></span>
-    <a class="btn ghost" href="/static/guide/index.html" target="_blank" rel="noopener">Guide</a>
-    <button type="button" class="btn ghost icon" id="rm-close" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-  <div class="wiz">
-    <nav class="wiz-nav" id="rm-nav"></nav>
-    <div class="wiz-body" id="rm-body"></div>
   </div>
-  <div class="modal-f"><span class="rm-msg" id="rm-msg" role="status" aria-live="polite"></span><span class="spacer"></span>
-    <button type="button" class="btn danger" id="rm-stop">Stop</button></div>
-</dialog>
-<dialog class="modal" id="confirm-modal">
-  <div class="modal-h"><h2>The arm is about to move</h2></div>
-  <div class="modal-b">
-    <p class="lead">Keep hands and objects you care about out of the arm's reach, and keep a hand near the power switch: it is the real emergency stop. The Stop button holds the arm where it is.</p>
-    <label class="row" style="font-size:12px;color:var(--text-2);cursor:pointer"><input type="checkbox" id="confirm-skip"> Don't ask again in this session</label>
-  </div>
-  <div class="modal-f"><span class="spacer"></span><button type="button" class="btn" id="confirm-cancel">Cancel</button><button type="button" class="btn primary" id="confirm-go">Move the arm</button></div>
-</dialog>
+</div></section>
 
-<div id="toasts" aria-live="polite"></div>
-<script src="/static/config.js"></script>
-<script type="module" src="/static/app.js"></script>
+<section id="how"><div class="wrap">
+  <h2>How a sentence becomes motion</h2>
+  <p class="sub">Four narrow agents, each doing one job, hand off to a controller stack that runs at control rate. Nothing is a single giant prompt.</p>
+  <div class="grid">
+    <div class="card step"><span class="no">01</span><div class="nm">Scout</div><p>Looks at the scene, notes what state each object is in (upright, fallen, blocked) and splits the task into ordered subtasks, or says plainly that the task cannot be done.</p></div>
+    <div class="card step"><span class="no">02</span><div class="nm">Composer</div><p>For each subtask, reuses a stored skill or writes a new recipe from five controller types, naming the keypoints it needs.</p></div>
+    <div class="card step"><span class="no">03</span><div class="nm">Tuner</div><p>Chooses the numbers: heights, force limits, widths, with the values that worked before offered as hints.</p></div>
+    <div class="card step"><span class="no">04</span><div class="nm">Spotter</div><p>Finds each keypoint in the image, refines it with a zoomed look, and lifts it to 3D with depth and a fitted surface normal.</p></div>
+  </div>
+</div></section>
+
+<section id="research"><div class="wrap">
+  <h2>What we have learned</h2>
+  <p class="sub">The pieces of this project that are research rather than plumbing.</p>
+  <div class="grid">
+    <div class="card"><h3>Task-axis control</h3><p>Behaviour is expressed as aligning axes between keypoints (position, axis, yaw, force, gripper), stacked by priority with exact null-space projection, instead of free-form joint trajectories.</p></div>
+    <div class="card"><h3>Coarse-to-fine grounding</h3><p>A grasp needs the target to about 5 mm. Pointing, a zoom pass, depth lift, then a wrist-camera close-up before reaching. Failures first try re-looking; only then a full replan.</p></div>
+    <div class="card"><h3>A skill library that grows</h3><p>Successful recipes are stored with roles instead of object names and reused later, along with the parameters that worked. Each arm keeps its own library.</p></div>
+    <div class="card"><h3>Reasoning about obstacles</h3><p>A depth-based clearance check tells the planner when open fingers would hit a neighbour, and it can decide to push the box aside before the original task.</p></div>
+    <div class="card"><h3>Typed decision advisor</h3><p>Two small calls, "did the subtask succeed" and "which recovery", can be answered by a typed-decision model with a confidence, falling back to rules when unsure.</p></div>
+    <div class="card"><h3>Inference in the browser</h3><p>The whole stack was ported to TypeScript and a web worker. Claude is called straight from the page with the visitor's own AWS credentials; skills live in IndexedDB.</p></div>
+  </div>
+
+  <h2 style="margin-top:48px">Results so far</h2>
+  <div class="stats">
+    <div class="stat card"><b>15 / 15</b><span>episodes solved with live Claude Sonnet 4.5 (5 seeds × 3 tasks)</span></div>
+    <div class="stat card"><b>≈ 8</b><span>model calls per episode</span></div>
+    <div class="stat card"><b>≈ $0.11</b><span>per episode on Bedrock</span></div>
+    <div class="stat card"><b>2 arms</b><span>Franka Panda and SO-ARM101</span></div>
+  </div>
+  <p class="note">Simulation only, a small sample. The scripted stand-in planner with simulated pointing noise reaches 12/12, 12/12 and 11/12 on bottle→box, cube→box and stacking. The real SO-101 path is covered by tests and a virtual servo rig; no physical-hardware results are reported. The decision-advisor benchmark has not been completed, so there are no accuracy numbers for it yet.</p>
+</div></section>
+
+<section id="code"><div class="wrap">
+  <h2>Read the code</h2>
+  <p class="sub">Apache-2.0. Everything on this page, including the engine you just ran, is in one repository.</p>
+  <div class="code"><span class="c"># the whole project</span>
+git clone https://github.com/jay7828/Dooms-inference
+cd Dooms-inference
+<span class="c"># the browser engine</span>
+npm install &amp;&amp; npm run build
+<span class="c"># or the Python reference stack</span>
+uv venv .venv --python 3.11 &amp;&amp; uv pip install --python .venv/bin/python -e ".[dev]"
+.venv/bin/python scripts/run_task.py --task put_bottle_in_box --seed 0 --llm scripted</div>
+  <div class="links">
+    <a href="https://github.com/jay7828/Dooms-inference" rel="noopener"><span class="path">jay7828/Dooms-inference</span><small>Repository, README and benchmark scripts</small></a>
+    <a href="https://github.com/jay7828/Dooms-inference/tree/main/web/engine" rel="noopener"><span class="path">web/engine</span><small>The in-browser engine: simulator wrapper, controllers, agents, Bedrock client</small></a>
+    <a href="https://github.com/jay7828/Dooms-inference/tree/main/src/dooms" rel="noopener"><span class="path">src/dooms</span><small>The Python reference implementation and benchmark harness</small></a>
+    <a href="https://github.com/jay7828/Dooms-inference/blob/main/docs/ARCHITECTURE.md" rel="noopener"><span class="path">docs/ARCHITECTURE.md</span><small>Design notes</small></a>
+  </div>
+</div></section>
+
+<footer><div class="wrap">Dooms · Apache-2.0 · Robot models from MuJoCo Menagerie and The Robot Studio SO-ARM100/101, under their own licences.</div></footer>
+
+<script>
+  const stage = document.getElementById("stage");
+  let scene = "put_cube_in_box";
+  function run(sc) {
+    scene = sc || scene;
+    const src = `/static/studio.html?autorun=1&scene=${scene}&planner=scripted&grounding=oracle&speed=2`;
+    let f = stage.querySelector("iframe");
+    if (!f) { f = document.createElement("iframe"); f.title = "Dooms studio"; f.allow = "fullscreen"; stage.appendChild(f); }
+    f.src = src;
+    document.getElementById("poster")?.remove();
+  }
+  document.getElementById("go").onclick = () => run();
+  document.querySelectorAll("[data-scene]").forEach((b) => (b.onclick = () => run(b.dataset.scene)));
+  document.getElementById("hero-run").addEventListener("click", () => setTimeout(() => { if (!stage.querySelector("iframe")) document.getElementById("go").focus(); }, 400));
+</script>
 </body>
 </html>
