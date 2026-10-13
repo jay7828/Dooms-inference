@@ -7,196 +7,274 @@
 <meta name="description" content="Dooms turns one sentence and one depth image into controller skills for a robot arm. Four Claude agents plan, a MuJoCo simulation runs it, all inside your browser.">
 <meta property="og:title" content="Dooms: language-driven robot manipulation">
 <meta property="og:image" content="/static/landing/studio.jpg">
+<script>
+  // theme before first paint: saved choice, else the system preference
+  (function () { var t = null; try { t = localStorage.getItem("dooms.theme"); } catch (e) {}
+    document.documentElement.dataset.theme = t || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="/static/landing/studio.jpg">
 <style>
-  /* One theme (dark: every asset is a dark simulator render), one accent (amber), radii: 14px surfaces, 10px controls. */
+  /* Tokens. One accent (signal lime) in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
+  :root, [data-theme="dark"] {
+    --bg: #07080a; --bg-2: #0c0e11; --surface: #111418; --line: #1d2127; --line-2: #2b3038;
+    --text: #f0f2f4; --text-2: #9aa2ad; --muted: #68707b;
+    --accent: #c6f432; --accent-ink: #0d1300; --accent-text: #c6f432; --accent-soft: rgba(198,244,50,.1);
+    --node-a: #141a05; --node-a-hot: #26330a; --edge: #606873; --pulse: #f0ffb8;
+    --code: #0a0c0f; --dot: rgba(255,255,255,.07); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
+    --nav: rgba(12,14,17,.72);
+  }
+  [data-theme="light"] {
+    --bg: #f1f3f0; --bg-2: #e8ebe7; --surface: #fafbf9; --line: #d9ddd7; --line-2: #c3c9c1;
+    --text: #0b0e0c; --text-2: #4c5650; --muted: #77817a;
+    --accent: #c6f432; --accent-ink: #0d1300; --accent-text: #456600; --accent-soft: rgba(120,160,0,.13);
+    --node-a: #edf8c4; --node-a-hot: #dcf08e; --edge: #8a938b; --pulse: #5a8500;
+    --code: #10130f; --dot: rgba(0,0,0,.09); --shadow: 0 50px 100px -45px rgba(20,30,10,.45);
+    --nav: rgba(250,251,249,.76);
+  }
   :root {
-    --bg: #0b0b0d; --bg-2: #101013; --surface: #141418; --line: #24242b; --line-2: #33333c;
-    --text: #f1f1f3; --text-2: #a9a9b4; --muted: #74747f;
-    --accent: #f0a04b; --accent-ink: #1b1206; --accent-soft: rgba(240,160,75,.12);
     --sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    --r: 14px; --r-s: 10px; --ease: cubic-bezier(.16, 1, .3, 1);
+    --r: 20px; --r-m: 16px; --ease: cubic-bezier(.16, 1, .3, 1);
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; overflow-x: clip; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased; transition: background-color .5s var(--ease), color .5s var(--ease); }
   img, video { display: block; max-width: 100%; }
   a { color: inherit; }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
-  h1, h2, h3 { margin: 0; letter-spacing: -.03em; line-height: 1.08; font-weight: 600; }
-  h2 { font-size: clamp(30px, 3.6vw, 46px); max-width: 18em; }
-  h3 { font-size: 21px; letter-spacing: -.015em; line-height: 1.25; }
-  p { margin: 0; }
-  .lede { color: var(--text-2); max-width: 60ch; margin-top: 16px; }
+  p, h1, h2, h3, figure { margin: 0; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+  h1, h2, h3 { letter-spacing: -.035em; line-height: 1.02; font-weight: 600; }
+  h2 { font-size: clamp(34px, 4.4vw, 60px); max-width: 15em; }
+  h3 { font-size: 22px; letter-spacing: -.02em; line-height: 1.2; }
+  .lede { color: var(--text-2); max-width: 56ch; margin-top: 18px; font-size: 18px; }
   .mono { font-family: var(--mono); }
-  section { padding: 104px 0; }
-  .head { margin-bottom: 44px; }
+  section { padding: 120px 0; }
+  .head { margin-bottom: 52px; }
+  :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
+  ::selection { background: var(--accent); color: var(--accent-ink); }
 
-  /* nav */
-  nav { position: sticky; top: 0; z-index: 10; background: rgba(11,11,13,.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
-  nav .wrap { display: flex; align-items: center; height: 64px; gap: 30px; }
-  .brand { font-weight: 700; font-size: 19px; letter-spacing: -.02em; text-decoration: none; }
+  /* floating nav */
+  nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; width: min(1216px, calc(100% - 28px));
+        display: flex; align-items: center; gap: 28px; height: 58px; padding: 0 10px 0 22px; border-radius: 999px;
+        background: var(--nav); backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); border: 1px solid var(--line-2); }
+  .brand { font-weight: 700; font-size: 19px; letter-spacing: -.03em; text-decoration: none; display: flex; align-items: center; gap: 9px; }
+  .brand i { width: 11px; height: 11px; border-radius: 3px; background: var(--accent); display: block; transform: rotate(45deg); }
   nav .links { display: flex; gap: 26px; margin-left: auto; }
   nav .links a { color: var(--text-2); text-decoration: none; font-size: 15px; transition: color .2s; }
   nav .links a:hover { color: var(--text); }
 
-  /* buttons */
-  .btn { display: inline-flex; align-items: center; gap: 9px; height: 46px; padding: 0 20px; border-radius: var(--r-s); border: 1px solid var(--line-2);
+  .btn { display: inline-flex; align-items: center; gap: 9px; height: 48px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line-2);
          background: transparent; color: var(--text); font: 500 15.5px var(--sans); text-decoration: none; cursor: pointer; white-space: nowrap;
-         transition: transform .2s var(--ease), background .2s, border-color .2s; }
-  .btn:hover { border-color: #55555f; background: rgba(255,255,255,.04); }
-  .btn:active { transform: scale(.98); }
+         transition: transform .25s var(--ease), background .2s, border-color .2s; }
+  .btn:hover { border-color: var(--muted); background: var(--accent-soft); }
+  .btn:active { transform: scale(.97); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  .btn.primary:hover { background: #f7b266; border-color: #f7b266; }
-  .btn.sm { height: 36px; padding: 0 14px; font-size: 14px; }
-  .btn img { width: 17px; height: 17px; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .btn.primary:hover { background: #d4fb55; border-color: #d4fb55; }
+  .btn.sm { height: 38px; padding: 0 16px; font-size: 14.5px; }
+  /* icons are Phosphor (MIT), inlined */
+  .ic { width: 1em; height: 1em; flex: none; }
+  .btn .ic { font-size: 18px; }
 
-  /* hero: copy left, real studio screenshot bleeding off the right edge */
-  .hero { padding: 76px 0 0; }
-  .hero-grid { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: 56px; align-items: center; }
-  .eyebrow { font: 500 13px var(--mono); color: var(--accent); letter-spacing: .04em; }
-  h1 { font-size: clamp(38px, 4.3vw, 60px); margin-top: 18px; max-width: 11em; }
-  .hero p { color: var(--text-2); font-size: 19px; max-width: 30em; margin-top: 22px; }
-  .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
-  .shot { border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; background: var(--bg-2); box-shadow: 0 40px 90px -30px rgba(0,0,0,.9); }
-  .hero .shot-wrap { width: 150%; perspective: 1800px; }
-  .hero .shot img { width: 100%; height: auto; aspect-ratio: 2160 / 1350; }
+  /* hero */
+  .hero { position: relative; padding: 148px 0 0; overflow: hidden; }
+  .hero::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(900px 620px at var(--hx, 30%) var(--hy, 30%), #000, transparent 75%); mask-image: radial-gradient(900px 620px at var(--hx, 30%) var(--hy, 30%), #000, transparent 75%); }
+  .hero .wrap { position: relative; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; font: 500 13px var(--mono); color: var(--accent-text); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 14px; background: var(--surface); }
+  h1 { font-size: clamp(46px, 7.4vw, 112px); font-weight: 700; letter-spacing: -.055em; line-height: .94; margin-top: 26px; }
+  h1 .dim { color: var(--muted); }
+  .hero-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 48px; align-items: end; margin-top: 36px; }
+  .hero-row > p { color: var(--text-2); font-size: 20px; max-width: 31em; }
+  /* command bar: pick a sentence, run it in the engine below */
+  .cmd { display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 8px 0 22px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow); }
+  .cmd .pr { color: var(--accent-text); font: 500 16px var(--mono); }
+  .cmd .tx { flex: 1; min-width: 0; font: 16px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cmd .tx::after { content: ""; display: inline-block; width: 8px; height: 18px; margin-left: 3px; background: var(--accent-text); vertical-align: -3px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .shot-wrap { margin-top: 72px; perspective: 2200px; }
+  .shot { border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; overflow: hidden; background: #0b0d10; box-shadow: var(--shadow); transform-origin: 50% 0; }
+  .shot img { width: 100%; height: auto; aspect-ratio: 2160 / 1350; }
+  .hero-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 180px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; }
+
+  /* numbers strip */
+  .strip { padding: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg-2); }
+  .strip .wrap { display: grid; grid-template-columns: repeat(4, 1fr); }
+  .strip .it { padding: 34px 28px; border-left: 1px solid var(--line); }
+  .strip .it:first-child { border-left: 0; padding-left: 0; }
+  .strip b { display: block; font: 600 clamp(30px, 3.4vw, 46px)/1 var(--sans); letter-spacing: -.04em; }
+  .strip span { display: block; color: var(--text-2); font-size: 14.5px; margin-top: 10px; }
 
   /* live engine */
-  .demo { border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; background: var(--bg-2); }
-  .demo-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  .demo-bar .lbl { color: var(--muted); font: 13px var(--mono); margin-right: 4px; }
+  .demo { border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; background: #0b0d10; box-shadow: var(--shadow); }
+  .demo-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid #1d2127; background: #0f1114; }
   .demo-bar .sp { flex: 1; }
-  .chip { height: 34px; padding: 0 13px; border-radius: var(--r-s); border: 1px solid var(--line-2); background: transparent; color: var(--text-2); font: 14px var(--sans); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
-  .chip:hover { color: var(--text); border-color: #55555f; }
-  .chip[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
-  .stage { position: relative; height: min(80vh, 760px); min-height: 480px; }
+  .chip { height: 36px; padding: 0 15px; border-radius: 999px; border: 1px solid #2b3038; background: transparent; color: #9aa2ad; font: 14px var(--mono); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
+  .chip:hover { color: #f0f2f4; border-color: #68707b; }
+  .chip[aria-pressed="true"] { color: #0d1300; border-color: var(--accent); background: var(--accent); }
+  .demo-bar .btn { color: #f0f2f4; border-color: #2b3038; }
+  .stage { position: relative; height: min(82vh, 780px); min-height: 500px; }
   .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .poster { position: absolute; inset: 0; border: 0; padding: 0; cursor: pointer; background: #08080a; }
-  .poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .28; transition: opacity .4s; }
-  .poster:hover img { opacity: .4; }
-  .poster .go { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; }
-  .poster .go small { display: block; color: var(--text); text-shadow: 0 1px 12px #000; font: 14px var(--sans); margin-top: 14px; }
+  .poster { position: absolute; inset: 0; border: 0; padding: 0; cursor: pointer; background: #07080a; color: #f0f2f4; }
+  .poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .3; transition: opacity .5s, transform 1.4s var(--ease); }
+  .poster:hover img { opacity: .42; transform: scale(1.03); }
+  .poster .go { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; width: min(90%, 420px); }
+  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); color: #0d1300; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
+  .poster:hover .play { transform: scale(1.08); }
+  .poster b { display: block; font: 600 24px var(--sans); letter-spacing: -.02em; }
+  .poster small { display: block; font: 14.5px var(--sans); margin-top: 8px; opacity: .78; }
 
   /* pipeline diagram */
-  .diagram { border: 1px solid var(--line); border-radius: var(--r); background: var(--bg-2); padding: 28px; overflow-x: auto; }
+  .diagram { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 32px; overflow-x: auto; }
   .diagram svg { display: block; width: 100%; min-width: 900px; height: auto; }
-  .diagram .n rect { fill: var(--surface); stroke: var(--line-2); }
-  .diagram .n.a rect { stroke: var(--accent); fill: #19150f; }
+  .diagram .n rect { fill: var(--bg); stroke: var(--line-2); }
+  .diagram .n.a rect { stroke: var(--accent-text); fill: var(--node-a); }
   .diagram .n.d rect { stroke-dasharray: 5 5; fill: transparent; }
   .diagram .t { font: 600 16px var(--sans); fill: var(--text); }
   .diagram .s { font: 12px var(--mono); fill: var(--text-2); }
   .diagram .l { font: 11.5px var(--mono); fill: var(--muted); }
-  .diagram .e { stroke: #6a6a76; stroke-width: 1.5; fill: none; }
-  .diagram .e.a { stroke: var(--accent); }
+  .diagram .e { stroke: var(--edge); stroke-width: 1.5; fill: none; }
+  .diagram .e.a { stroke: var(--accent-text); }
   .diagram .e.f { stroke-dasharray: 6 6; }
-  .legend { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 18px; color: var(--text-2); font-size: 14.5px; }
+  .diagram .mk { fill: var(--edge); } .diagram .mka { fill: var(--accent-text); }
+  .pulses path { fill: none; stroke: var(--pulse); stroke-width: 3; stroke-linecap: round; stroke-dasharray: .16 1; stroke-dashoffset: .16; opacity: 0; }
+  .legend { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 20px; color: var(--text-2); font-size: 14.5px; }
   .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line-2); vertical-align: -2px; margin-right: 8px; }
-  .legend .la { border-color: var(--accent); background: #19150f; }
+  .legend .la { border-color: var(--accent-text); background: var(--node-a); }
   .legend .ld { border-style: dashed; }
 
-  /* what the Spotter sees: one large frame, two stacked */
-  .frames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  .frames figure { margin: 0; }
-    .frames .ph { border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; }
-  .frames img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
-  figcaption { color: var(--text-2); font-size: 14.5px; margin-top: 10px; max-width: 52ch; }
-  figcaption code { font: 13px var(--mono); color: var(--text); }
-
-  /* a real run */
-  .run { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; align-items: center; }
-  .run video { width: 100%; border-radius: var(--r); border: 1px solid var(--line-2); background: #000; aspect-ratio: 4 / 3; }
-  .facts { display: grid; grid-template-columns: repeat(3, auto); gap: 28px; margin-top: 32px; justify-content: start; }
-  .facts b { display: block; font: 600 34px var(--sans); letter-spacing: -.03em; }
+  /* one real run: sticky rail on the left, the agents' actual answers on the right */
+  .story { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 72px; }
+  .rail { position: sticky; top: 120px; align-self: start; }
+  .rail ol { list-style: none; margin: 0; padding: 0; position: relative; }
+  .rail ol::before { content: ""; position: absolute; left: 8px; top: 14px; bottom: 14px; width: 2px; background: var(--line-2); }
+  .rail ol::after { content: ""; position: absolute; left: 8px; top: 14px; width: 2px; height: calc((100% - 28px) * var(--p, 0)); background: var(--accent-text); transition: height .7s var(--ease); }
+  .rail li { position: relative; padding: 0 0 34px 38px; color: var(--muted); transition: color .4s; }
+  .rail li:last-child { padding-bottom: 0; }
+  .rail li::before { content: ""; position: absolute; left: 0; top: 5px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 2px solid var(--line-2); z-index: 1; transition: border-color .4s, background .4s, transform .5s var(--ease); }
+  .rail li b { display: block; font: 600 21px var(--sans); letter-spacing: -.02em; }
+  .rail li span { font-size: 14px; }
+  .rail li.done { color: var(--text-2); } .rail li.done::before { border-color: var(--accent-text); background: var(--accent-text); }
+  .rail li.on { color: var(--text); } .rail li.on::before { border-color: var(--accent-text); background: var(--accent); transform: scale(1.25); }
+  .steps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .step { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 34px; opacity: .38; transform: scale(.985); transition: opacity .6s var(--ease), transform .6s var(--ease), border-color .4s; }
+  .step.on { opacity: 1; transform: none; border-color: var(--line-2); }
+  .step .who { font: 500 13px var(--mono); color: var(--accent-text); }
+  .step h3 { font-size: 28px; margin-top: 8px; }
+  .step > p { color: var(--text-2); margin-top: 10px; max-width: 58ch; }
+  .step > p.quote { margin-top: 22px; padding: 16px 20px; border-left: 2px solid var(--accent-text); background: var(--bg); border-radius: 0 12px 12px 0; font-size: 16px; color: var(--text); max-width: none; }
+  .subs { margin: 20px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; counter-reset: s; }
+  .subs li { counter-increment: s; font-size: 15.5px; display: flex; gap: 12px; }
+  .subs li::before { content: counter(s, decimal-leading-zero); font: 13px var(--mono); color: var(--muted); padding-top: 3px; }
+  pre.code { margin: 22px 0 0; padding: 18px 20px; border-radius: 14px; background: var(--code); border: 1px solid #1d2127; font: 13.5px/1.8 var(--mono); color: #d3d7de; overflow-x: auto; }
+  pre.code .k { color: #c6f432; } pre.code .c { color: #7b838e; }
+  .params { margin-top: 22px; display: grid; gap: 10px; }
+  .params div { display: grid; grid-template-columns: 6.5em 5.5em 1fr; gap: 14px; align-items: baseline; font-size: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .params div:last-child { border-bottom: 0; padding-bottom: 0; }
+  .params code { font: 14px var(--mono); color: var(--accent-text); }
+  .params b { font: 500 15px var(--mono); }
+  .params span { color: var(--text-2); }
+  .spot { margin-top: 22px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: center; }
+  .spot .params { margin-top: 0; } .spot .params div { grid-template-columns: 1fr; gap: 2px; }
+  .spot img, .result video { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-m); border: 1px solid var(--line-2); background: #000; }
+  .result { margin-top: 22px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+  .facts { display: grid; gap: 18px; }
+  .facts b { display: block; font: 600 38px/1 var(--sans); letter-spacing: -.04em; }
   .facts span { color: var(--text-2); font-size: 14.5px; }
+
+  /* hard cases: text left, two frames staggered right */
+  .hard { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: center; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .pair figure:last-child { margin-top: 64px; }
+  .ph { border-radius: var(--r-m); border: 1px solid var(--line-2); overflow: hidden; }
+  .ph img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; transition: transform 1.2s var(--ease); }
+  figure:hover .ph img { transform: scale(1.04); }
+  figcaption { color: var(--text-2); font-size: 14.5px; margin-top: 12px; }
+  figcaption code { font: 13px var(--mono); color: var(--text); }
 
   /* research bento: 5 items, 5 cells */
   .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
-  .cell { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 28px; overflow: hidden; }
+  .cell { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 30px; overflow: hidden; }
+  .cell::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s; background: radial-gradient(440px circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 62%); }
+  .cell:hover { border-color: var(--line-2); } .cell:hover::after { opacity: 1; }
   .cell p { color: var(--text-2); font-size: 15.5px; margin-top: 10px; max-width: 54ch; }
   .c-axis { grid-column: span 4; }
-  .c-arms { grid-column: span 2; grid-row: span 2; padding: 0; display: flex; flex-direction: column; background: #5b5d66; }
-  .c-arms img { width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: 50% 40%; }
-  .c-arms div { padding: 22px 26px 26px; background: var(--surface); }
-  .c-lib, .c-adv { grid-column: span 2; }
-  .c-web { grid-column: span 6; display: grid; grid-template-columns: 5fr 7fr; gap: 0; padding: 0; }
-  .c-web > div { padding: 34px 30px; align-self: center; }
-  .c-web img { width: 100%; height: 100%; max-height: 330px; object-fit: cover; object-position: 50% 45%; }
-  pre.recipe { margin: 20px 0 0; padding: 16px 18px; border-radius: var(--r-s); background: #0c0c0f; border: 1px solid var(--line); font: 13px/1.75 var(--mono); color: #cdd0dc; overflow-x: auto; }
-  pre.recipe .k { color: var(--accent); }
-  pre.recipe .c { color: var(--muted); }
+  .c-arms { grid-column: span 2; grid-row: span 2; padding: 0; display: flex; flex-direction: column; }
+  .c-arms img { width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: 50% 40%; transition: transform 1.2s var(--ease); }
+  .c-arms > div { padding: 24px 28px 28px; }
+  .c-lib { grid-column: span 2; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .c-lib p { color: #2c3a05; }
+  .c-lib:hover { border-color: var(--accent); }
+  .c-adv { grid-column: span 2; }
+  .c-web { grid-column: span 6; display: grid; grid-template-columns: 5fr 7fr; padding: 0; }
+  .c-web > div { padding: 38px 34px; align-self: center; }
+  .c-web img { width: 100%; height: 100%; max-height: 340px; object-fit: cover; object-position: 50% 45%; transition: transform 1.2s var(--ease); }
+  .c-arms:hover img, .c-web:hover img { transform: scale(1.04); }
 
   /* results */
-  .tbl { width: 100%; border-collapse: collapse; font-size: 16px; }
-  .tbl th { text-align: left; font: 500 13px var(--mono); color: var(--muted); padding: 0 16px 14px 0; border-bottom: 1px solid var(--line-2); }
-  .tbl td { padding: 20px 16px 20px 0; border-bottom: 1px solid var(--line); }
-  .tbl tr:last-child td { border-bottom: 0; }
-  .tbl td.num, .tbl th.num { text-align: right; font-family: var(--mono); padding-right: 0; padding-left: 16px; }
-  .tbl td.win { color: var(--accent); font-family: var(--mono); }
   .tblwrap { overflow-x: auto; }
-  .caveat { color: var(--muted); font-size: 14.5px; margin-top: 26px; max-width: 78ch; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 16.5px; min-width: 700px; }
+  .tbl th { text-align: left; font: 500 13px var(--mono); color: var(--muted); padding: 0 16px 16px 0; border-bottom: 1px solid var(--line-2); }
+  .tbl td { padding: 24px 16px 24px 0; border-bottom: 1px solid var(--line); }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl .num { text-align: right; font-family: var(--mono); padding-right: 0; padding-left: 16px; }
+  .tbl td.win { font: 500 16.5px var(--mono); }
+  .tbl td.win span { background: var(--accent); color: var(--accent-ink); padding: 4px 12px; border-radius: 999px; }
+  .caveat { color: var(--muted); font-size: 14.5px; margin-top: 28px; max-width: 78ch; }
 
   /* code */
-  .code { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: start; }
-  .paths { margin-top: 30px; display: grid; gap: 2px; }
-  .paths a { display: grid; grid-template-columns: 11.5em 1fr; gap: 14px; padding: 13px 0; text-decoration: none; border-top: 1px solid var(--line); color: var(--text-2); font-size: 15px; transition: color .2s; }
+  .getit { border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface); padding: 56px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 56px; align-items: center; position: relative; overflow: hidden; }
+  .getit::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px); background-size: 26px 26px; -webkit-mask-image: linear-gradient(120deg, #000, transparent 55%); mask-image: linear-gradient(120deg, #000, transparent 55%); }
+  .getit > * { position: relative; }
+  .getit .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+  .paths { margin-top: 30px; display: grid; }
+  .paths a { display: grid; grid-template-columns: 11.5em 1fr; gap: 14px; padding: 12px 0; text-decoration: none; border-top: 1px solid var(--line); color: var(--text-2); font-size: 15px; transition: color .2s; }
   .paths a:hover { color: var(--text); }
-  .paths a code { font: 14px var(--mono); color: var(--accent); }
-  pre.term { margin: 0; padding: 24px 26px; border-radius: var(--r); background: var(--bg-2); border: 1px solid var(--line); font: 14px/1.85 var(--mono); color: #d6d8e2; overflow-x: auto; }
-  pre.term .c { color: var(--muted); }
+  .paths a code { font: 14px var(--mono); color: var(--accent-text); }
+  pre.term { margin: 0; padding: 26px 28px; border-radius: var(--r-m); background: var(--code); border: 1px solid #1d2127; font: 14px/1.9 var(--mono); color: #d3d7de; overflow-x: auto; }
+  pre.term .c { color: #7b838e; }
 
-  footer { border-top: 1px solid var(--line); padding: 32px 0 56px; color: var(--muted); font-size: 14.5px; }
+  footer { padding: 34px 0 110px; color: var(--muted); font-size: 14.5px; }
   footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
   footer a { color: var(--text-2); }
 
+  /* floating theme switch */
+  .theme { position: fixed; right: 22px; bottom: 22px; z-index: 40; width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--line-2); cursor: pointer;
+           background: var(--text); color: var(--bg); display: grid; place-items: center; font-size: 24px; box-shadow: 0 14px 34px -12px rgba(0,0,0,.6);
+           transition: transform .4s var(--ease); }
+  .theme:hover { transform: scale(1.08) rotate(18deg); }
+  .theme:active { transform: scale(.94); }
+  .theme .ic { grid-area: 1 / 1; transition: transform .6s var(--ease), opacity .3s; }
+  [data-theme="dark"] .theme .ph-moon, [data-theme="light"] .theme .ph-sun { opacity: 0; transform: rotate(-90deg) scale(.4); }
 
-  /* ---------- motion. Everything below is gated on prefers-reduced-motion: no-preference. ---------- */
-  .progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: 0 50%; z-index: 20; pointer-events: none; }
-  nav .links a { position: relative; }
-  nav .links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 1px; background: var(--accent); transform: scaleX(0); transform-origin: 0 50%; transition: transform .35s var(--ease); }
-  nav .links a:hover::after { transform: scaleX(1); }
-  .cell { position: relative; transition: border-color .3s, transform .5s var(--ease); }
-  .cell::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s;
-                 background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(240,160,75,.11), transparent 62%); }
-  .cell:hover { border-color: #3d3d47; }
-  .cell:hover::after { opacity: 1; }
-  .frames .ph img, .c-arms img, .c-web img { transition: transform 1.2s var(--ease); }
-  .frames figure:hover img, .c-arms:hover img, .c-web:hover img { transform: scale(1.035); }
-  .pulses path { fill: none; stroke: #ffd29b; stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: .16 1; stroke-dashoffset: .16; opacity: 0; }
+  .progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--accent-text); transform: scaleX(0); transform-origin: 0 50%; z-index: 50; pointer-events: none; }
 
+  /* ---------- motion, only when the visitor has not asked for less ---------- */
   @media (prefers-reduced-motion: no-preference) {
-    /* reading progress, driven by the scroll position itself (no scroll listeners) */
     @supports (animation-timeline: scroll()) {
       .progress { animation: grow linear both; animation-timeline: scroll(root); }
       @keyframes grow { to { transform: scaleX(1); } }
-      /* the hero screenshot starts tilted toward the reader and settles flat as the page moves on to the live demo */
-      .hero .shot { animation: settle linear both; animation-timeline: scroll(root); animation-range: 0 620px; transform-origin: 0 50%; }
-      @keyframes settle { from { transform: rotateY(-13deg) rotateX(5deg) translateZ(0); } to { transform: rotateY(0) rotateX(0) translateY(-18px); } }
+      /* the screenshot lies back like a tabletop and stands up as you scroll into it */
+      .shot { animation: stand linear both; animation-timeline: scroll(root); animation-range: 0 640px; }
+      @keyframes stand { from { transform: rotateX(34deg) scale(.94); } to { transform: rotateX(0) scale(1); } }
     }
-
-    /* headline: words rise out of a mask, in reading order */
-    h1 .w { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .08em; margin-bottom: -.08em; }
-    h1 .w > span { display: inline-block; transform: translateY(105%); animation: word .9s var(--ease) calc(.05s * var(--i) + .1s) both; }
+    h1 .w { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .1em; margin-bottom: -.1em; }
+    h1 .w > span { display: inline-block; transform: translateY(108%); animation: word 1s var(--ease) calc(.055s * var(--i) + .1s) both; }
     @keyframes word { to { transform: none; } }
-    .hero .copy > h1 { animation: none; }
-    .hero .shot-wrap { animation: rise 1.2s var(--ease) .25s both; }
+    .eyebrow, .hero-row, .shot-wrap { animation: rise 1.1s var(--ease) both; }
+    .hero-row { animation-delay: .45s; } .shot-wrap { animation-delay: .55s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(28px); } }
 
-    /* grouped reveals arrive one after another */
-    .rv { transition-delay: calc(var(--s, 0) * 90ms); }
-    .frames .ph { clip-path: inset(0 0 100% 0 round 14px); transition: clip-path 1.1s var(--ease) calc(var(--s, 0) * 120ms + 80ms); }
-    .frames .rv.in .ph { clip-path: inset(0 0 0 0 round 14px); }
-    .frames .ph img { transform: scale(1.12); }
-    .frames .rv.in .ph img { transform: scale(1); }
-    .frames figure.in:hover img { transform: scale(1.035); }
+    .rv { opacity: 0; transform: translateY(26px); transition: opacity .9s var(--ease), transform .9s var(--ease); transition-delay: calc(var(--s, 0) * 90ms); }
+    .rv.in { opacity: 1; transform: none; }
+    .ph { clip-path: inset(0 0 100% 0 round 16px); transition: clip-path 1.1s var(--ease) calc(var(--s, 0) * 140ms + 80ms); }
+    .rv.in .ph { clip-path: inset(0 0 0 0 round 16px); }
     .tbl tbody tr { opacity: 0; transform: translateY(14px); transition: opacity .7s var(--ease), transform .7s var(--ease); transition-delay: calc(var(--s, 0) * 110ms + 150ms); }
     .rv.in .tbl tbody tr { opacity: 1; transform: none; }
 
-    /* diagram: boxes appear in pipeline order, the wiring draws itself, then signals keep flowing */
     .diagram .n { opacity: 0; transform: translateY(10px); transform-box: fill-box; transition: opacity .6s var(--ease), transform .6s var(--ease); transition-delay: calc(var(--i) * 70ms); }
     .diagram.in .n { opacity: 1; transform: none; }
     .diagram .e[pathLength] { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset .9s var(--ease), opacity .2s; transition-delay: calc(var(--i) * 90ms + 500ms); }
@@ -208,79 +286,89 @@
     .diagram.in .pulses path { animation: flow 5.2s linear calc(var(--d) + 2.2s) infinite; }
     @keyframes flow { 0% { stroke-dashoffset: .16; opacity: 0; } 2% { opacity: 1; } 11% { opacity: 1; } 13%, 100% { stroke-dashoffset: -1; opacity: 0; } }
     .diagram.in .n.a rect { animation: think 5.2s ease-in-out 2.2s infinite; }
-    @keyframes think { 0%, 30%, 100% { fill: #19150f; } 12% { fill: #2a2012; } }
+    @keyframes think { 0%, 30%, 100% { fill: var(--node-a); } 12% { fill: var(--node-a-hot); } }
+    .poster .play { animation: beat 2.4s var(--ease) infinite; }
+    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(198,244,50,.45); } 60% { box-shadow: 0 0 0 26px rgba(198,244,50,0); } }
   }
+  /* theme change: a circular wipe from the switch, where the browser supports view transitions */
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+  ::view-transition-new(root) { animation: wipe .7s var(--ease); }
+  @keyframes wipe { from { clip-path: circle(0 at calc(100% - 50px) calc(100% - 50px)); } to { clip-path: circle(150vmax at calc(100% - 50px) calc(100% - 50px)); } }
 
-  /* scroll reveal (storytelling: sections arrive as you reach them). Off under reduced motion. */
-  @media (prefers-reduced-motion: no-preference) {
-    .rv { opacity: 0; transform: translateY(22px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
-    .rv.in { opacity: 1; transform: none; }
-    .hero .copy > * { animation: rise .9s var(--ease) both; }
-    .hero .copy > :nth-child(2) { animation-delay: .06s; } .hero .copy > :nth-child(3) { animation-delay: .12s; } .hero .copy > :nth-child(4) { animation-delay: .18s; }
-    @keyframes rise { from { opacity: 0; transform: translateY(26px); } }
-  }
-
-  @media (max-width: 900px) {
+  @media (max-width: 960px) {
     body { font-size: 16px; }
     .wrap { padding: 0 18px; }
-    section { padding: 68px 0; }
-    nav .links { display: none; }
-    nav .btn { margin-left: auto; }
-    .hero { padding-top: 44px; }
-    .hero-grid, .run, .code { grid-template-columns: 1fr; gap: 34px; }
-    .hero .shot-wrap { width: 100%; }
-    .frames { grid-template-columns: 1fr; gap: 28px; }
-    .bento { grid-template-columns: 1fr; }
+    section { padding: 76px 0; }
+    nav .links { display: none; } nav .btn { margin-left: auto; }
+    .hero { padding-top: 112px; }
+    .hero-row { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .hero-row > p { font-size: 18px; }
+    .cmd { padding-left: 18px; } .cmd .tx { font-size: 14px; } .cmd .btn .ic { display: none; }
+    .shot-wrap { margin-top: 48px; }
+    .strip .wrap { grid-template-columns: 1fr 1fr; }
+    .strip .it { padding: 24px 18px; } .strip .it:nth-child(odd) { border-left: 0; padding-left: 0; } .strip .it:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .story { grid-template-columns: minmax(0, 1fr); gap: 0; } .rail { display: none; }
+    .step { padding: 24px; opacity: 1; transform: none; }
+    .step h3 { font-size: 24px; }
+    .subs, .spot, .result, .hard, .getit, .c-web { grid-template-columns: minmax(0, 1fr); }
+    .hard { gap: 36px; } .pair figure:last-child { margin-top: 28px; }
+    .params div { grid-template-columns: 4.8em 4.6em 1fr; gap: 10px; }
+    .bento { grid-template-columns: minmax(0, 1fr); }
     .c-axis, .c-arms, .c-lib, .c-adv, .c-web { grid-column: auto; grid-row: auto; }
     .c-arms img { max-height: 340px; }
-    .c-web { grid-template-columns: 1fr; }
-    .facts { gap: 20px; }
-    .facts b { font-size: 28px; }
+    .getit { padding: 28px; gap: 32px; }
     .paths a { grid-template-columns: 1fr; gap: 2px; }
     .stage { height: 78vh; }
+    .theme { right: 16px; bottom: 16px; }
   }
 </style>
 </head>
 <body>
-
 <div class="progress" aria-hidden="true"></div>
-<nav><div class="wrap">
-  <a class="brand" href="/">Dooms</a>
-  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#research">Research</a><a href="#results">Results</a></div>
-  <a class="btn sm" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><img src="https://cdn.simpleicons.org/github/f1f1f3" alt="">View on GitHub</a>
-</div></nav>
 
-<header class="hero"><div class="wrap hero-grid">
-  <div class="copy">
-    <div class="eyebrow">Open research in robot manipulation</div>
-    <h1 id="h1">One sentence in. A working robot plan out.</h1>
-    <p>Four Claude agents turn a command and a depth image into controller skills, then a physics simulation runs them in your browser.</p>
-    <div class="cta">
-      <a class="btn primary" href="#engine">Run the demo</a>
-      <a class="btn" href="https://github.com/jay7828/Dooms-inference" rel="noopener">View on GitHub</a>
+<nav>
+  <a class="brand" href="/"><i></i>Dooms</a>
+  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#run">A real run</a><a href="#results">Results</a></div>
+  <a class="btn sm" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><svg class="ic ph-github-logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>View on GitHub</a>
+</nav>
+
+<header class="hero" id="hero"><div class="wrap">
+  <span class="eyebrow">Open research in robot manipulation</span>
+  <h1 id="h1" aria-label="Tell a robot what to do. Watch it work it out.">Tell a robot what to do. <span class="dim">Watch it work it out.</span></h1>
+  <div class="hero-row">
+    <p>Four Claude agents turn one sentence and a depth image into controller skills. The whole stack runs in your browser.</p>
+    <div class="cmd">
+      <span class="pr">&gt;</span><span class="tx" id="typed">put the red cube into the box</span>
+      <button class="btn primary" id="cmd-run">Run the demo<svg class="ic ph-arrow-down" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,149.66l-72,72a8,8,0,0,1-11.32,0l-72-72a8,8,0,0,1,11.32-11.32L120,196.69V40a8,8,0,0,1,16,0V196.69l58.34-58.35a8,8,0,0,1,11.32,11.32Z"/></svg></button>
     </div>
   </div>
   <div class="shot-wrap"><div class="shot"><img src="/static/landing/studio.jpg" width="2160" height="1350" alt="The Dooms studio mid-run: a Franka Panda arm lifting a bottle, with the plan and controller recipe beside it"></div></div>
-</div></header>
+</div><div class="hero-fade"></div></header>
+
+<section class="strip" aria-label="Key numbers"><div class="wrap">
+  <div class="it"><b>15 / 15</b><span>recorded episodes solved with live Claude</span></div>
+  <div class="it"><b>8</b><span>model calls for a whole task</span></div>
+  <div class="it"><b>$0.11</b><span>average Bedrock cost per episode</span></div>
+  <div class="it"><b>0</b><span>servers needed to run the simulator</span></div>
+</div></section>
 
 <section id="engine"><div class="wrap">
   <div class="head rv">
     <h2>Try the engine. Nothing to install.</h2>
-    <p class="lede">This is MuJoCo compiled to WebAssembly, driving a Franka Panda in a web worker on your machine. The built-in demo planner needs no account.</p>
+    <p class="lede">MuJoCo compiled to WebAssembly, driving a Franka Panda in a web worker on your machine. The built-in demo planner needs no account.</p>
   </div>
   <div class="demo rv">
     <div class="demo-bar">
-      <span class="lbl">task</span>
-      <button class="chip" data-scene="put_cube_in_box" aria-pressed="true">Put the cube in the box</button>
-      <button class="chip" data-scene="stack_cubes" aria-pressed="false">Stack the cubes</button>
-      <button class="chip" data-scene="put_bottle_in_box" aria-pressed="false">Put the bottle in the box</button>
+      <button class="chip" data-scene="put_cube_in_box" aria-pressed="true">put the red cube into the box</button>
+      <button class="chip" data-scene="stack_cubes" aria-pressed="false">stack the red cube on the blue cube</button>
+      <button class="chip" data-scene="put_bottle_in_box" aria-pressed="false">put the bottle into the box</button>
       <span class="sp"></span>
-      <a class="btn sm" href="/static/studio.html">Open the studio</a>
+      <a class="btn sm" href="/static/studio.html">Open the studio<svg class="ic ph-arrow-up-right" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></a>
     </div>
     <div class="stage" id="stage">
       <button class="poster" id="poster" aria-label="Run the demo">
         <img src="/static/landing/franka.jpg" alt="" loading="lazy">
-        <span class="go"><span class="btn primary">Run the demo</span><small>Loads about 10 MB of physics and robot models, then your browser caches them.</small></span>
+        <span class="go"><span class="play"><svg class="ic ph-play" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87a15.86,15.86,0,0,1,8.12-13.82,16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg></span><b>Run the demo</b><small>Loads about 10 MB of physics and robot models, then your browser caches them.</small></span>
       </button>
     </div>
   </div>
@@ -288,17 +376,15 @@
 
 <section id="pipeline"><div class="wrap">
   <div class="head rv">
-    <h2>Four small agents instead of one large prompt</h2>
+    <h2>Four small agents, not one large prompt</h2>
     <p class="lede">Each agent has one job and a typed output. Their answers compile into a stack of task-axis controllers that runs at control rate, with no model in the loop.</p>
   </div>
   <div class="diagram rv" id="diagram">
     <svg viewBox="0 0 1180 540" role="img" aria-label="Pipeline diagram: a sentence and a camera frame go to the Scout, Composer, Tuner and Spotter agents, whose outputs are compiled into a controller stack that drives the arm. Failures loop back to the Scout.">
       <defs>
-        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#6a6a76"/></marker>
-        <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#f0a04b"/></marker>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk" d="M0 0 10 5 0 10z"/></marker>
+        <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mka" d="M0 0 10 5 0 10z"/></marker>
       </defs>
-
-      <!-- edges -->
       <path style="--i:1" pathLength="1" class="e" d="M200 182H258" marker-end="url(#ah)"/>
       <path style="--i:2" pathLength="1" class="e" d="M200 392H230V206H258" marker-end="url(#ah)"/>
       <path style="--i:3" pathLength="1" class="e" d="M200 412H498" marker-end="url(#ah)"/>
@@ -310,10 +396,7 @@
       <path style="--i:9" pathLength="1" class="e a" d="M680 412H950V206H978" marker-end="url(#aa)"/>
       <path style="--i:10" pathLength="1" class="e" d="M1070 226V288" marker-end="url(#ah)"/>
       <path style="--i:11" pathLength="1" class="e" d="M1070 374V436" marker-end="url(#ah)"/>
-      <path style="--i:12" class="e f" d="M980 498H350V228" marker-end="url(#ah)"/>
-
-
-      <!-- signal pulses: the order information moves through the pipeline -->
+      <path class="e f" d="M980 498H350V228" marker-end="url(#ah)"/>
       <g class="pulses" aria-hidden="true">
         <path style="--d:0s" pathLength="1" d="M200 182H258"/>
         <path style="--d:.5s" pathLength="1" d="M440 182H498"/>
@@ -324,77 +407,116 @@
         <path style="--d:2.3s" pathLength="1" d="M1070 226V288"/>
         <path style="--d:2.8s" pathLength="1" d="M1070 374V436"/>
       </g>
-      <!-- edge labels -->
       <text class="l" x="600" y="302">keypoints it needs</text>
       <text class="l" x="600" y="112">reuse / store</text>
       <text class="l" x="712" y="402">3D points + surface normals</text>
       <text class="l" x="520" y="488">subtask failed: look again, then replan</text>
       <text class="l" x="1082" y="264">grounded skill</text>
       <text class="l" x="1082" y="412">joint commands</text>
-
-      <!-- inputs -->
-      <g style="--i:1" class="n"><rect x="20" y="140" width="180" height="84" rx="10"/><text class="t" x="38" y="174">A sentence</text><text class="s" x="38" y="198">"put the bottle</text><text class="s" x="38" y="214"> into the box"</text></g>
-      <g style="--i:2" class="n"><rect x="20" y="370" width="180" height="84" rx="10"/><text class="t" x="38" y="404">Camera frame</text><text class="s" x="38" y="428">RGB + depth,</text><text class="s" x="38" y="444">camera pose</text></g>
-
-      <!-- agents -->
-      <g style="--i:3" class="n a"><rect x="260" y="140" width="180" height="84" rx="10"/><text class="t" x="278" y="174">Scout</text><text class="s" x="278" y="198">reads the scene,</text><text class="s" x="278" y="214">splits the task</text></g>
-      <g style="--i:4" class="n a"><rect x="500" y="140" width="180" height="84" rx="10"/><text class="t" x="518" y="174">Composer</text><text class="s" x="518" y="198">picks controllers</text><text class="s" x="518" y="214">for each subtask</text></g>
-      <g style="--i:5" class="n a"><rect x="740" y="140" width="180" height="84" rx="10"/><text class="t" x="758" y="174">Tuner</text><text class="s" x="758" y="198">sets heights,</text><text class="s" x="758" y="214">forces, widths</text></g>
-      <g style="--i:6" class="n a"><rect x="500" y="370" width="180" height="84" rx="10"/><text class="t" x="518" y="404">Spotter</text><text class="s" x="518" y="428">points in the image,</text><text class="s" x="518" y="444">lifts to 3D</text></g>
-
-      <!-- memory -->
-      <g style="--i:7" class="n d"><rect x="500" y="14" width="180" height="60" rx="10"/><text class="t" x="518" y="42">Skill library</text><text class="s" x="518" y="60">recipes that worked</text></g>
-
-      <!-- deterministic -->
-      <g style="--i:8" class="n"><rect x="980" y="140" width="180" height="84" rx="10"/><text class="t" x="998" y="174">Compiler</text><text class="s" x="998" y="198">checks clearance,</text><text class="s" x="998" y="214">orders by priority</text></g>
-      <g style="--i:9" class="n"><rect x="980" y="290" width="180" height="84" rx="10"/><text class="t" x="998" y="324">Controller stack</text><text class="s" x="998" y="348">null-space projection,</text><text class="s" x="998" y="364">every control tick</text></g>
-      <g style="--i:10" class="n"><rect x="980" y="438" width="180" height="84" rx="10"/><text class="t" x="998" y="472">The arm</text><text class="s" x="998" y="496">MuJoCo in WASM,</text><text class="s" x="998" y="512">or a real SO-101</text></g>
+      <g style="--i:1" class="n"><rect x="20" y="140" width="180" height="84" rx="12"/><text class="t" x="38" y="174">A sentence</text><text class="s" x="38" y="198">"put the bottle</text><text class="s" x="38" y="214"> into the box"</text></g>
+      <g style="--i:2" class="n"><rect x="20" y="370" width="180" height="84" rx="12"/><text class="t" x="38" y="404">Camera frame</text><text class="s" x="38" y="428">RGB + depth,</text><text class="s" x="38" y="444">camera pose</text></g>
+      <g style="--i:3" class="n a"><rect x="260" y="140" width="180" height="84" rx="12"/><text class="t" x="278" y="174">Scout</text><text class="s" x="278" y="198">reads the scene,</text><text class="s" x="278" y="214">splits the task</text></g>
+      <g style="--i:4" class="n a"><rect x="500" y="140" width="180" height="84" rx="12"/><text class="t" x="518" y="174">Composer</text><text class="s" x="518" y="198">picks controllers</text><text class="s" x="518" y="214">for each subtask</text></g>
+      <g style="--i:5" class="n a"><rect x="740" y="140" width="180" height="84" rx="12"/><text class="t" x="758" y="174">Tuner</text><text class="s" x="758" y="198">sets heights,</text><text class="s" x="758" y="214">forces, widths</text></g>
+      <g style="--i:6" class="n a"><rect x="500" y="370" width="180" height="84" rx="12"/><text class="t" x="518" y="404">Spotter</text><text class="s" x="518" y="428">points in the image,</text><text class="s" x="518" y="444">lifts to 3D</text></g>
+      <g style="--i:7" class="n d"><rect x="500" y="14" width="180" height="60" rx="12"/><text class="t" x="518" y="42">Skill library</text><text class="s" x="518" y="60">recipes that worked</text></g>
+      <g style="--i:8" class="n"><rect x="980" y="140" width="180" height="84" rx="12"/><text class="t" x="998" y="174">Compiler</text><text class="s" x="998" y="198">checks clearance,</text><text class="s" x="998" y="214">orders by priority</text></g>
+      <g style="--i:9" class="n"><rect x="980" y="290" width="180" height="84" rx="12"/><text class="t" x="998" y="324">Controller stack</text><text class="s" x="998" y="348">null-space projection,</text><text class="s" x="998" y="364">every control tick</text></g>
+      <g style="--i:10" class="n"><rect x="980" y="438" width="180" height="84" rx="12"/><text class="t" x="998" y="472">The arm</text><text class="s" x="998" y="496">MuJoCo in WASM,</text><text class="s" x="998" y="512">or a real SO-101</text></g>
     </svg>
   </div>
   <div class="legend rv"><span><i class="la"></i>Claude agent with a typed output</span><span><i></i>Deterministic code</span><span><i class="ld"></i>Memory that persists between runs</span></div>
 </div></section>
 
-<section id="vision"><div class="wrap">
+<section id="run"><div class="wrap">
   <div class="head rv">
-    <h2>What the Spotter actually sees</h2>
-    <p class="lede">These are unedited frames from recorded runs. The red rings are where Claude pointed; depth and a plane fit turn each one into a 3D target.</p>
+    <h2>One real run, answer by answer</h2>
+    <p class="lede">Everything below is copied from a recorded episode: Claude Sonnet 4.5 on Amazon Bedrock, asked to "put the bottle into the box".</p>
   </div>
-  <div class="frames">
-    <figure class="rv"><div class="ph"><img src="/static/landing/ground-fallen.jpg" width="640" height="480" loading="lazy" alt="Simulator camera frame: a bottle lying on its side against a box, with keypoints marked on the bottle and on an empty patch of table"></div>
-      <figcaption>A knocked-over bottle. The Composer asked for a keypoint that exists in no object list, <code>table_free_spot</code>, and the Spotter found one.</figcaption></figure>
-    <figure class="rv"><div class="ph"><img src="/static/landing/ground-upright.jpg" width="640" height="480" loading="lazy" alt="Simulator camera frame: an upright bottle and an open box with a grasp point and a placement point marked"></div>
-      <figcaption>The easy case: a grasp point on the bottle and a drop point inside the box.</figcaption></figure>
-    <figure class="rv"><div class="ph"><img src="/static/landing/ground-blocked.jpg" width="640" height="480" loading="lazy" alt="Simulator camera frame after the bottle has been moved: keypoints re-grounded from the new scene"></div>
-      <figcaption>Later in the same run the bottle has moved, so the scene is grounded again from a fresh frame.</figcaption></figure>
-  </div>
-</div></section>
-
-<section id="run"><div class="wrap run">
-  <video class="rv" src="/static/landing/run-bottle.mp4" autoplay muted loop playsinline preload="metadata" aria-label="Recording of a simulated Franka arm putting a bottle into a box"></video>
-  <div class="rv">
-    <h2>A recorded run, planned by Claude</h2>
-    <p class="lede">Claude Sonnet 4.5 on Amazon Bedrock, from the instruction "put the bottle into the box" to a bottle in the box, with no replans.</p>
-    <div class="facts">
-      <div><b data-n="8">8</b><span>model calls</span></div>
-      <div><b data-n="0.13" data-pre="$" data-dp="2">$0.13</b><span>Bedrock cost</span></div>
-      <div><b data-n="6.4" data-post=" s" data-dp="1">6.4 s</b><span>of robot motion</span></div>
+  <div class="story">
+    <aside class="rail" aria-hidden="true"><ol id="rail">
+      <li><b>Scout</b><span>reads the scene</span></li>
+      <li><b>Composer</b><span>writes the recipe</span></li>
+      <li><b>Tuner</b><span>picks the numbers</span></li>
+      <li><b>Spotter</b><span>finds the points</span></li>
+      <li><b>The arm</b><span>does it</span></li>
+    </ol></aside>
+    <div class="steps">
+      <article class="step on">
+        <span class="who">Scout said</span>
+        <h3>The bottle is upright. Six steps.</h3>
+        <p class="quote">"The bottle is standing upright on the table to the right of the box. The box appears empty with no obstructions inside. The bottle's cap end is at the top, making it suitable for top-down grasping."</p>
+        <ol class="subs"><li>Approach bottle for pre-grasp</li><li>Grasp the bottle</li><li>Lift the bottle up</li><li>Move over the box</li><li>Lower the bottle into the box</li><li>Release and retract</li></ol>
+      </article>
+      <article class="step">
+        <span class="who">Composer wrote</span>
+        <h3>A recipe per step, with blanks for the numbers</h3>
+        <p>For the first step it defined a skill called <code class="mono">approach_bottle_pregrasp</code> and asked the Spotter for one keypoint, the centre of the bottle's cap.</p>
+<pre class="code"><span class="c"># subtask 1: Approach bottle for pre-grasp</span>
+[p1] <span class="k">PosAlign</span>(eef_tcp, bottle_cap, axis=x, <span class="c">o_x</span>)
+[p1] <span class="k">PosAlign</span>(eef_tcp, bottle_cap, axis=y, <span class="c">o_y</span>)
+[p1] <span class="k">PosAlign</span>(eef_tcp, bottle_cap, axis=z, <span class="c">o_z</span>)
+[p2] <span class="k">AxisAlign</span>(eef_z, bottle_cap_normal, <span class="c">o_theta</span>)</pre>
+      </article>
+      <article class="step">
+        <span class="who">Tuner set</span>
+        <h3>Every blank, with a reason</h3>
+        <div class="params">
+          <div><code>o_z</code><b>0.12 m</b><span>Hover 12 cm above the bottle cap for pre-grasp approach</span></div>
+          <div><code>o_theta</code><b>180°</b><span>Gripper points down onto upward-facing cap surface</span></div>
+          <div><code>o_d</code><b>-0.015 m</b><span>Fingertip centre goes half the cap height below the cap top to centre pads on the cap</span></div>
+          <div><code>f</code><b>3 N</b><span>Gentle contact force threshold for placing the bottle</span></div>
+        </div>
+      </article>
+      <article class="step">
+        <span class="who">Spotter pointed</span>
+        <h3>Two pixels become two places in space</h3>
+        <div class="spot">
+          <img src="/static/landing/ground-upright.jpg" width="640" height="480" loading="lazy" alt="The camera frame the Spotter saw, with rings on the bottle cap and inside the box">
+          <div class="params">
+            <div><code>bottle_cap at pixel 377, 188</code><span>2.2 mm from the simulator's ground truth</span></div>
+            <div><code>box_inside at pixel 265, 285</code><span>29 mm off, still inside the tray</span></div>
+          </div>
+        </div>
+      </article>
+      <article class="step">
+        <span class="who">The arm did</span>
+        <h3>Bottle in the box, first try</h3>
+        <div class="result">
+          <video src="/static/landing/run-bottle.mp4" muted loop playsinline preload="metadata" aria-label="Recording of the simulated Franka arm putting the bottle into the box"></video>
+          <div class="facts">
+            <div><b data-n="8">8</b><span>model calls</span></div>
+            <div><b data-n="0.13" data-pre="$" data-dp="2">$0.13</b><span>Bedrock cost</span></div>
+            <div><b data-n="6.4" data-post=" s" data-dp="1">6.4 s</b><span>of robot motion, no replans</span></div>
+          </div>
+        </div>
+      </article>
     </div>
   </div>
 </div></section>
 
-<section id="research"><div class="wrap">
-  <div class="head rv">
-    <h2>What we are studying</h2>
+<section id="hard"><div class="wrap hard">
+  <div class="rv">
+    <h2>It also has to cope when things go wrong</h2>
+    <p class="lede">In this recorded run the bottle was knocked over beside the box. The Composer asked for a keypoint that is in no object list, a free spot on the table, and the Spotter found one. A grasp was missed along the way and the scene was grounded again before the run finished.</p>
   </div>
+  <div class="pair">
+    <figure class="rv"><div class="ph"><img src="/static/landing/ground-fallen.jpg" width="640" height="480" loading="lazy" alt="Camera frame: a bottle lying against the box, with a ring on an empty patch of table"></div><figcaption>First look: <code>table_free_spot</code> marked bottom left.</figcaption></figure>
+    <figure class="rv"><div class="ph"><img src="/static/landing/ground-blocked.jpg" width="640" height="480" loading="lazy" alt="Camera frame later in the run: the bottle has moved and is marked again"></div><figcaption>Later: the bottle has moved, so it is grounded again.</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="research"><div class="wrap">
+  <div class="head rv"><h2>What we are studying</h2></div>
   <div class="bento">
     <div class="cell c-axis rv">
       <h3>Behaviour as aligned axes, not trajectories</h3>
-      <p>A skill is a short list of controllers, each aligning one point or axis with another. The agents write this; the runtime stacks it by priority.</p>
-<pre class="recipe"><span class="c"># "Lift the bottle up", as the studio shows it</span>
-[p1] <span class="k">PosAlign</span>(bottle_cap, bottle_cap, axis=x, o_x=0)
-[p1] <span class="k">PosAlign</span>(bottle_cap, bottle_cap, axis=y, o_y=0)
-[p1] <span class="k">PosAlign</span>(bottle_cap, bottle_cap, axis=z, o_z=0.2)   <span class="c"># 20 cm above the grasp</span>
-[p2] <span class="k">AxisAlign</span>(eef_z, bottle_cap_normal, o_theta=180)        <span class="c"># gripper stays vertical</span></pre>
+      <p>A skill is a short list of controllers, each aligning one point or axis with another, or pushing until contact. The runtime stacks them by priority.</p>
+<pre class="code"><span class="c"># subtask 5: Lower the bottle into the box</span>
+[p1] <span class="k">PosAlign</span>(bottle_cap, box_inside, axis=x, offset=+0.000 m)
+[p1] <span class="k">PosAlign</span>(bottle_cap, box_inside, axis=y, offset=+0.000 m)
+[p1] <span class="k">Force</span>(axis=-z, contact&gt;=3.0 N)
+[p2] <span class="k">AxisAlign</span>(eef_z, box_inside_normal, angle=180 deg)</pre>
     </div>
     <div class="cell c-arms rv">
       <img src="/static/landing/so101.jpg" width="900" height="1061" loading="lazy" alt="A yellow SO-ARM101 hobby arm lowering a red cube into a box in the simulator">
@@ -424,27 +546,28 @@
     <table class="tbl">
       <thead><tr><th>Task</th><th>Solved</th><th class="num">Model calls</th><th class="num">Cost</th><th class="num">Planning time</th><th class="num">Grounding error</th></tr></thead>
       <tbody>
-        <tr><td>Put the bottle in the box</td><td class="win">5 / 5</td><td class="num">8.0</td><td class="num">$0.105</td><td class="num">47.2 s</td><td class="num">7.8 mm</td></tr>
-        <tr><td>Put the cube in the box</td><td class="win">5 / 5</td><td class="num">8.0</td><td class="num">$0.107</td><td class="num">47.1 s</td><td class="num">22.0 mm</td></tr>
-        <tr><td>Stack the cubes</td><td class="win">5 / 5</td><td class="num">8.0</td><td class="num">$0.104</td><td class="num">44.4 s</td><td class="num">5.8 mm</td></tr>
+        <tr><td>Put the bottle in the box</td><td class="win"><span>5 / 5</span></td><td class="num">8.0</td><td class="num">$0.105</td><td class="num">47.2 s</td><td class="num">7.8 mm</td></tr>
+        <tr><td>Put the cube in the box</td><td class="win"><span>5 / 5</span></td><td class="num">8.0</td><td class="num">$0.107</td><td class="num">47.1 s</td><td class="num">22.0 mm</td></tr>
+        <tr><td>Stack the cubes</td><td class="win"><span>5 / 5</span></td><td class="num">8.0</td><td class="num">$0.104</td><td class="num">44.4 s</td><td class="num">5.8 mm</td></tr>
       </tbody>
     </table>
   </div>
   <p class="caveat rv">Read these as an early check, not a benchmark claim. With 5 episodes per task the 95% interval on each success rate runs from 57% to 100%. Harder scenes (a fallen bottle, a blocked grasp) still fail some of the time. Nothing here was measured on physical hardware.</p>
 </div></section>
 
-<section id="code"><div class="wrap code">
-  <div class="rv">
-    <h2>All of it is open</h2>
-    <p class="lede">Apache-2.0, one repository: the engine you just ran, the Python reference stack and the benchmark harness.</p>
-    <div class="cta"><a class="btn primary" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><img src="https://cdn.simpleicons.org/github/1b1206" alt="">View on GitHub</a></div>
-    <div class="paths">
-      <a href="https://github.com/jay7828/Dooms-inference/tree/main/web/engine" rel="noopener"><code>web/engine</code><span>The browser engine: simulator, controllers, agents, Bedrock client</span></a>
-      <a href="https://github.com/jay7828/Dooms-inference/tree/main/src/dooms" rel="noopener"><code>src/dooms</code><span>Python reference implementation and real-robot drivers</span></a>
-      <a href="https://github.com/jay7828/Dooms-inference/blob/main/docs/ARCHITECTURE.md" rel="noopener"><code>docs/ARCHITECTURE.md</code><span>Design notes</span></a>
+<section id="code"><div class="wrap">
+  <div class="getit rv">
+    <div>
+      <h2>All of it is open</h2>
+      <p class="lede">Apache-2.0, one repository: the engine you just ran, the Python reference stack and the benchmark harness.</p>
+      <div class="cta"><a class="btn primary" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><svg class="ic ph-github-logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>View on GitHub</a></div>
+      <div class="paths">
+        <a href="https://github.com/jay7828/Dooms-inference/tree/main/web/engine" rel="noopener"><code>web/engine</code><span>Browser engine: simulator, controllers, agents</span></a>
+        <a href="https://github.com/jay7828/Dooms-inference/tree/main/src/dooms" rel="noopener"><code>src/dooms</code><span>Python reference stack and real-robot drivers</span></a>
+        <a href="https://github.com/jay7828/Dooms-inference/blob/main/docs/ARCHITECTURE.md" rel="noopener"><code>docs/ARCHITECTURE.md</code><span>Design notes</span></a>
+      </div>
     </div>
-  </div>
-<pre class="term rv"><span class="c"># get the code</span>
+<pre class="term"><span class="c"># get the code</span>
 git clone https://github.com/jay7828/Dooms-inference
 cd Dooms-inference
 
@@ -456,6 +579,7 @@ uv venv .venv --python 3.11
 uv pip install --python .venv/bin/python -e ".[dev]"
 .venv/bin/python scripts/run_task.py \
     --task put_bottle_in_box --seed 0 --llm scripted</pre>
+  </div>
 </div></section>
 
 <footer><div class="wrap">
@@ -463,59 +587,83 @@ uv pip install --python .venv/bin/python -e ".[dev]"
   <span>Robot models: <a href="https://github.com/google-deepmind/mujoco_menagerie" rel="noopener">MuJoCo Menagerie</a> and <a href="https://github.com/TheRobotStudio/SO-ARM100" rel="noopener">The Robot Studio SO-ARM100</a>.</span>
 </div></footer>
 
+<button class="theme" id="theme" aria-label="Switch between light and dark theme" title="Switch theme"><svg class="ic ph-sun" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></svg><svg class="ic ph-moon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></svg></button>
+
 <script>
-  const stage = document.getElementById("stage"), chips = [...document.querySelectorAll(".chip")];
-  let scene = "put_cube_in_box";
+  const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+  const motion = matchMedia("(prefers-reduced-motion: no-preference)").matches;
+
+  /* theme switch */
+  $("#theme").onclick = () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    const apply = () => { document.documentElement.dataset.theme = next; try { localStorage.setItem("dooms.theme", next); } catch (e) {} };
+    if (motion && document.startViewTransition) document.startViewTransition(apply); else apply();
+  };
+
+  /* live engine */
+  const stage = $("#stage"), chips = $$(".chip");
+  const CMDS = [["put_cube_in_box", "put the red cube into the box"], ["stack_cubes", "stack the red cube on the blue cube"], ["put_bottle_in_box", "put the bottle into the box"]];
+  let scene = CMDS[0][0];
   function run(sc) {
     scene = sc || scene;
     chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.scene === scene)));
     let f = stage.querySelector("iframe");
     if (!f) { f = document.createElement("iframe"); f.title = "Dooms studio, running in your browser"; f.allow = "fullscreen"; stage.appendChild(f); }
     f.src = `/static/studio.html?autorun=1&scene=${scene}&planner=scripted&grounding=oracle&speed=2`;
-    document.getElementById("poster")?.remove();
+    $("#poster")?.remove();
   }
-  document.getElementById("poster").onclick = () => run();
+  $("#poster").onclick = () => run();
   chips.forEach((c) => (c.onclick = () => run(c.dataset.scene)));
 
-  const motion = matchMedia("(prefers-reduced-motion: no-preference)").matches;
-
-  // headline words (masked rise), built from the plain text so it stays readable without JS
+  /* hero command bar: types the three commands in turn; Run sends the one on screen to the engine */
+  let ci = 0;
+  $("#cmd-run").onclick = () => { $("#engine").scrollIntoView({ behavior: motion ? "smooth" : "auto" }); run(CMDS[ci][0]); };
   if (motion) {
-    const h = document.getElementById("h1"), words = h.textContent.trim().split(/\s+/);
-    h.setAttribute("aria-label", h.textContent.trim());
-    h.innerHTML = words.map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${w}</span></span>`).join(" ");
+    const el = $("#typed"), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    (async function loop() {
+      await wait(2600);
+      for (;;) {
+        for (let n = el.textContent.length; n >= 0; n--) { el.textContent = el.textContent.slice(0, n); await wait(18); }
+        ci = (ci + 1) % CMDS.length;
+        for (const ch of CMDS[ci][1]) { el.textContent += ch; await wait(34 + Math.random() * 40); }
+        await wait(2800);
+      }
+    })();
+    // headline words rise out of a mask, in reading order
+    const h = $("#h1"); let i = 0;
+    const wrap = (t) => t.trim().split(/\s+/).map((w) => `<span class="w" aria-hidden="true"><span style="--i:${i++}">${w}</span></span>`).join(" ");
+    h.innerHTML = [...h.childNodes].filter((n) => n.textContent.trim()).map((n) => (n.nodeType === 3 ? wrap(n.textContent) : `<span class="dim">${wrap(n.textContent)}</span>`)).join(" ");
+    // the dot grid lights up around the cursor
+    $("#hero").addEventListener("pointermove", (e) => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty("--hx", e.clientX - r.left + "px"); e.currentTarget.style.setProperty("--hy", e.clientY - r.top + "px"); });
   }
 
-  // stagger siblings that reveal together
-  document.querySelectorAll(".frames, .bento, .tbl tbody").forEach((g) => [...g.children].forEach((el, i) => el.style.setProperty("--s", i)));
-
-  // numbers count up once, when they are first seen
+  /* reveals */
+  $$(".bento, .tbl tbody, .pair").forEach((g) => [...g.children].forEach((el, i) => el.style.setProperty("--s", i)));
   function count(el) {
-    const end = +el.dataset.n, dp = +(el.dataset.dp || 0), pre = el.dataset.pre || "", post = el.dataset.post || "", t0 = performance.now(), dur = 1100;
-    (function tick(t) {
-      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 4);
-      el.textContent = pre + (end * e).toFixed(dp) + post;
-      if (k < 1) requestAnimationFrame(tick);
-    })(t0);
+    const end = +el.dataset.n, dp = +(el.dataset.dp || 0), pre = el.dataset.pre || "", post = el.dataset.post || "", t0 = performance.now();
+    (function tick(t) { const k = Math.min(1, (t - t0) / 1100), e = 1 - Math.pow(1 - k, 4); el.textContent = pre + (end * e).toFixed(dp) + post; if (k < 1) requestAnimationFrame(tick); })(t0);
   }
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: 0.14 });
+  $$(".rv").forEach((el) => io.observe(el));
 
-  const io = new IntersectionObserver((es) => es.forEach((e) => {
-    if (!e.isIntersecting) return;
-    e.target.classList.add("in"); io.unobserve(e.target);
-    if (motion) e.target.querySelectorAll("[data-n]").forEach(count);
-  }), { threshold: 0.14 });
-  document.querySelectorAll(".rv").forEach((el) => io.observe(el));
+  /* the run story: whichever answer is at mid-screen lights its place on the rail */
+  const steps = $$(".step"), rail = $$("#rail li"), vid = $(".result video");
+  let counted = false;
+  function activate(k) {
+    steps.forEach((s, i) => s.classList.toggle("on", i === k));
+    rail.forEach((li, i) => { li.classList.toggle("on", i === k); li.classList.toggle("done", i < k); });
+    $("#rail").style.setProperty("--p", k / (steps.length - 1));
+    if (k === steps.length - 1) {
+      if (motion) vid.play().catch(() => {});
+      if (motion && !counted) { counted = true; $$("[data-n]").forEach(count); }
+    } else vid.pause();
+  }
+  activate(0);
+  const so = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) activate(steps.indexOf(e.target)); }), { rootMargin: "-45% 0px -45% 0px" });
+  steps.forEach((s) => so.observe(s));
+  if (!motion) vid.controls = true;
 
-  // the recorded run only plays while it is on screen
-  const vid = document.querySelector(".run video");
-  new IntersectionObserver(([e]) => { if (e.isIntersecting) vid.play().catch(() => {}); else vid.pause(); }, { threshold: 0.3 }).observe(vid);
-  if (!motion) { vid.removeAttribute("autoplay"); vid.controls = true; vid.pause(); }
-
-  // cursor-following highlight on the research tiles
-  document.querySelectorAll(".cell").forEach((c) => c.addEventListener("pointermove", (e) => {
-    const r = c.getBoundingClientRect();
-    c.style.setProperty("--mx", e.clientX - r.left + "px"); c.style.setProperty("--my", e.clientY - r.top + "px");
-  }));
+  $$(".cell").forEach((c) => c.addEventListener("pointermove", (e) => { const r = c.getBoundingClientRect(); c.style.setProperty("--mx", e.clientX - r.left + "px"); c.style.setProperty("--my", e.clientY - r.top + "px"); }));
 </script>
 </body>
 </html>
