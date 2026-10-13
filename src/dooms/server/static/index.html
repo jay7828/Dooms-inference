@@ -233,7 +233,7 @@
   .trow { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr) 96px; gap: 28px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
   .trow .nm { font-size: 16.5px; line-height: 1.3; }
   .trow .nm small { display: block; color: var(--muted); font: 13px var(--mono); margin-top: 3px; }
-  .trow .sqs { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); gap: 4px; max-width: 620px; }
+  .trow .sqs { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 5px; max-width: 760px; }
   .sq { display: block; aspect-ratio: 1; border-radius: 4px; background: var(--accent); }
   .sq.miss { background: transparent; box-shadow: inset 0 0 0 2px var(--text); }
   .trow .sq { cursor: default; transition: transform .2s var(--ease); }
@@ -320,7 +320,7 @@
     .diagram.in .n.a rect { animation: think 5.2s ease-in-out 2.2s infinite; }
     @keyframes think { 0%, 30%, 100% { fill: var(--node-a); } 12% { fill: var(--node-a-hot); } }
     .trials .sq { opacity: 0; transform: scale(.3); }
-    .trials.in .sq { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .45s var(--ease); transition-delay: calc(var(--k) * 9ms + var(--r) * 90ms); }
+    .trials.in .sq { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .45s var(--ease); transition-delay: calc(var(--k) * 14ms + var(--r) * 110ms); }
     .trials.in .sq:hover { transition-delay: 0s; transform: scale(1.35); }
     .poster .play { animation: beat 2.4s var(--ease) infinite; }
     @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,90,46,.45); } 60% { box-shadow: 0 0 0 26px rgba(255,90,46,0); } }
@@ -350,7 +350,7 @@
     .params div { grid-template-columns: 4.8em 4.6em 1fr; gap: 10px; }
     .bento { grid-template-columns: minmax(0, 1fr); }
     .uses { grid-template-columns: minmax(0, 1fr); } .uses > div, .uses > div + div { padding: 26px 0; border-left: 0; } .uses > div + div { border-top: 1px solid var(--line); }
-    .trow { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; } .trow .sqs { grid-column: 1 / -1; grid-row: 2; }
+    .trow { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; } .trow .sqs { grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(15, minmax(0, 1fr)); }
     h3.sub { margin-top: 56px; }
     .c-axis, .c-arms, .c-lib, .c-adv, .c-web { grid-column: auto; grid-row: auto; }
     .c-arms img { max-height: 340px; }
@@ -384,9 +384,9 @@
 </div><div class="hero-fade"></div></header>
 
 <section class="strip" aria-label="Key numbers"><div class="wrap">
-  <div class="it"><b>348 / 350</b><span>simulated trials solved, checked against ground truth</span></div>
-  <div class="it"><b>7 × 50</b><span>task set-ups and random seeds each</span></div>
-  <div class="it"><b>2</b><span>robot arms on one pipeline</span></div>
+  <div class="it"><b>142 / 150</b><span>simulated trials solved with Claude planning</span></div>
+  <div class="it"><b>5 × 30</b><span>tasks and random seeds each, no demonstrations</span></div>
+  <div class="it"><b>$0.13</b><span>of Claude calls per task, 8 calls on average</span></div>
   <div class="it"><b>0</b><span>servers needed to run the simulator</span></div>
 </div></section>
 
@@ -587,25 +587,27 @@
 
 <section id="results"><div class="wrap">
   <div class="head rv">
-    <h2>350 trials, every one counted</h2>
-    <p class="lede">Seven set-ups, 50 random seeds each, scored by the simulator's own ground truth. Each square is one trial.</p>
+    <h2>150 trials with Claude, every one counted</h2>
+    <p class="lede">Claude Sonnet 4.5 on Amazon Bedrock plans, a Franka Panda acts. Five tasks, 30 random seeds each, scored by the simulator's own ground truth. Each square is one trial.</p>
   </div>
-  <div class="trials rv" id="trials" role="img" aria-label="Trials solved per set-up: six set-ups solved 50 of 50, SO-ARM101 stacking solved 48 of 50."></div>
+  <div class="trials rv" id="trials" role="img" aria-label="Trials solved per task with Claude planning: bottle in box 30 of 30, red cube in box 29 of 30, stack red on blue 29 of 30, blue cube in box on a cluttered table 29 of 30, stack blue on red on a cluttered table 25 of 30."></div>
   <div class="tkey rv"><span><i class="sq"></i>Solved</span><span><i class="sq miss"></i>Not solved</span></div>
-  <p class="caveat rv">Planning in these 350 trials is the scripted reference planner, with simulated pointing noise of 6 pixels (1 pixel after refinement). So this measures grounding, control and execution, not Claude's planning. Both misses were cubes that did not end up stacked. Simulation only.</p>
+  <p class="caveat rv">No demonstrations and no training: each trial is a fresh plan from one sentence and one camera frame. In every miss the arm finished its plan but the object did not end up where the task asked. Simulation only; nothing here was measured on physical hardware.</p>
 
-  <h3 class="sub rv">With live Claude Sonnet 4.5 planning</h3>
+  <h3 class="sub rv">What each task cost</h3>
   <div class="tblwrap rv">
     <table class="tbl">
       <thead><tr><th>Task</th><th>Solved</th><th class="num">Model calls</th><th class="num">Cost</th><th class="num">Planning time</th><th class="num">Grounding error</th></tr></thead>
       <tbody>
-        <tr><td>Put the bottle in the box</td><td class="win"><span>5 / 5</span></td><td class="num">8.0</td><td class="num">$0.105</td><td class="num">47.2 s</td><td class="num">7.8 mm</td></tr>
-        <tr><td>Put the cube in the box</td><td class="win"><span>5 / 5</span></td><td class="num">8.0</td><td class="num">$0.107</td><td class="num">47.1 s</td><td class="num">22.0 mm</td></tr>
-        <tr><td>Stack the cubes</td><td class="win"><span>5 / 5</span></td><td class="num">8.0</td><td class="num">$0.104</td><td class="num">44.4 s</td><td class="num">5.8 mm</td></tr>
+        <tr><td>Put the bottle in the box</td><td class="win"><span>30 / 30</span></td><td class="num">8.3</td><td class="num">$0.131</td><td class="num">60.3 s</td><td class="num">12.4 mm</td></tr>
+        <tr><td>Put the red cube in the box</td><td class="win"><span>29 / 30</span></td><td class="num">8.0</td><td class="num">$0.133</td><td class="num">61.9 s</td><td class="num">18.5 mm</td></tr>
+        <tr><td>Stack red on blue</td><td class="win"><span>29 / 30</span></td><td class="num">8.0</td><td class="num">$0.131</td><td class="num">61.0 s</td><td class="num">7.0 mm</td></tr>
+        <tr><td>Blue cube in the box, cluttered table</td><td class="win"><span>29 / 30</span></td><td class="num">8.2</td><td class="num">$0.136</td><td class="num">63.7 s</td><td class="num">24.1 mm</td></tr>
+        <tr><td>Stack blue on red, cluttered table</td><td class="win"><span>25 / 30</span></td><td class="num">8.0</td><td class="num">$0.130</td><td class="num">59.9 s</td><td class="num">17.8 mm</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="caveat rv">A much smaller sample: 5 seeds per task, so each success rate has a 95% interval from 57% to 100%. Harder scenes (a fallen bottle, a blocked grasp) still fail some of the time. Nothing here was measured on physical hardware.</p>
+  <p class="caveat rv">Averages per trial. Cost is computed from token counts at list price. With the scripted reference planner in place of Claude, the same five Franka tasks solve 250 of 250 trials (50 seeds each), which isolates grounding, control and execution from planning.</p>
 </div></section>
 
 <section id="code"><div class="wrap">
@@ -690,15 +692,15 @@ uv pip install --python .venv/bin/python -e ".[dev]"
     $("#hero").addEventListener("pointermove", (e) => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty("--hx", e.clientX - r.left + "px"); e.currentTarget.style.setProperty("--hy", e.clientY - r.top + "px"); });
   }
 
-  /* trials: runs/trials_scripted (scripts/run_trials.py --llm scripted --seeds 50). misses = seeds that failed */
+  /* trials: runs/trials_claude (scripts/run_trials.py --llm bedrock --seeds 30), Franka tasks. misses = seeds that failed */
+  const N = 30;
   const TRIALS = [
-    ["Put the bottle in the box", "Franka Panda", []], ["Put the red cube in the box", "Franka Panda", []], ["Stack red on blue", "Franka Panda", []],
-    ["Blue cube in the box, cluttered table", "Franka Panda", []], ["Stack blue on red, cluttered table", "Franka Panda", []],
-    ["Put the red cube in the box", "SO-ARM101", []], ["Stack red on blue", "SO-ARM101", [30, 43]],
+    ["Put the bottle in the box", []], ["Put the red cube in the box", [12]], ["Stack red on blue", [0]],
+    ["Blue cube in the box, cluttered table", [25]], ["Stack blue on red, cluttered table", [2, 5, 11, 13, 22]],
   ];
-  $("#trials").innerHTML = TRIALS.map(([name, arm, miss], r) => `<div class="trow"><div class="nm">${name}<small>${arm}</small></div><div class="sqs">${
-    Array.from({ length: 50 }, (_, k) => `<i class="sq${miss.includes(k) ? " miss" : ""}" style="--k:${k};--r:${r}" data-tip="seed ${k}: ${miss.includes(k) ? "not solved" : "solved"}"></i>`).join("")
-  }</div><div class="ct">${50 - miss.length}<small> / 50</small></div></div>`).join("");
+  $("#trials").innerHTML = TRIALS.map(([name, miss], r) => `<div class="trow"><div class="nm">${name}</div><div class="sqs">${
+    Array.from({ length: N }, (_, k) => `<i class="sq${miss.includes(k) ? " miss" : ""}" style="--k:${k};--r:${r}" data-tip="seed ${k}: ${miss.includes(k) ? "not solved" : "solved"}"></i>`).join("")
+  }</div><div class="ct">${N - miss.length}<small> / ${N}</small></div></div>`).join("");
   const tip = document.createElement("div"); tip.className = "tip"; document.body.appendChild(tip);
   $("#trials").addEventListener("pointermove", (e) => { const t = e.target.closest("[data-tip]"); if (!t) return (tip.style.opacity = 0); const b = t.getBoundingClientRect(); tip.textContent = t.dataset.tip; tip.style.left = b.left + b.width / 2 + "px"; tip.style.top = b.top + "px"; tip.style.opacity = 1; });
   $("#trials").addEventListener("pointerleave", () => (tip.style.opacity = 0));
