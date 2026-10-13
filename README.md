@@ -1,191 +1,234 @@
-# Dooms-inference
+# Dooms
 
-Agentic task-axis manipulation in simulation: a task prompt + an RGB-D image from a simulated camera go
-through four Claude agents on Amazon Bedrock, are compiled into task-axis controller skills, and executed
-on a Franka Panda in MuJoCo. A benchmark harness scores it.
+Tell a robot arm what to do in one sentence. Four Claude agents turn the sentence and one RGB-D camera frame into
+task-axis controller skills, and a MuJoCo simulation (or a real SO-101) runs them. No demonstrations, no training.
 
-![architecture](docs/architecture.jpg)
+**Live demo: https://dooms-inference.vercel.app** (the simulator runs in your browser; the built-in demo planner
+needs no account).
+
+![The Dooms studio mid-run: a Franka Panda lifting a bottle, with the plan and controller recipe beside it](src/dooms/server/static/landing/studio.jpg)
+
+## How it works
 
 ```
-prompt + RGB-D ─► 01 Task Decomposer ─► 02 Skill Generator ─► 03 Parameter Setter ─┐
-                                              │ requested keypoints                  ├─► compile ─► runtime ─► MuJoCo
-                                              └──────────────► 04 Vision Grounder ───┘   (PosAlign / AxisAlign / YawAlign / Force / Gripper)
+sentence + RGB-D frame ─► Scout ─► Composer ─► Tuner ─┐
+                                      │ keypoints      ├─► compile ─► controller stack ─► arm
+                                      └────► Spotter ──┘   (PosAlign / AxisAlign / YawAlign / Force / Gripper)
 ```
 
-## Setup
+| Agent (UI name) | Name in the code | Job |
+| --- | --- | --- |
+| Scout | `task_decomposer` | Describes the scene, splits the task into ordered subtasks, or says the task is infeasible |
+| Composer | `skill_generator` | Reuses a stored skill or writes a controller recipe for each subtask, naming the keypoints it needs |
+| Tuner | `parameter_setter` | Sets every number in the recipes (heights, forces, widths) |
+| Spotter | `vision_grounder` | Points at each keypoint in the image, refines it, and lifts it to 3D with depth and a plane fit |
+
+The agents' typed answers are compiled into a priority stack of task-axis controllers that runs at control rate with
+no model in the loop. A monitor watches each subtask; on failure the pipeline looks at the scene again, and only then
+replans. Full diagram: [docs/architecture.jpg](docs/architecture.jpg) (it uses the code names).
+Design notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Results
+
+All numbers are **simulation only**, scored by the simulator's ground-truth predicate (`inside` / `on_top`), all or
+nothing. Nothing here was measured on physical hardware.
+
+### Claude Sonnet 4.5 on Amazon Bedrock, 30 seeds per task
+
+| Task | Arm | Solved | 95% CI | Model calls | Cost | Planning time |
+| --- | --- | --- | --- | --- | --- | --- |
+| Put the bottle in the box | Franka Panda | 30 / 30 | 89%-100% | 8.3 | $0.131 | 60 s |
+| Put the red cube in the box | Franka Panda | 29 / 30 | 83%-99% | 8.0 | $0.133 | 62 s |
+| Stack red on blue | Franka Panda | 29 / 30 | 83%-99% | 8.0 | $0.131 | 61 s |
+| Blue cube in the box, cluttered table | Franka Panda | 29 / 30 | 83%-99% | 8.2 | $0.136 | 64 s |
+| Stack blue on red, cluttered table | Franka Panda | 25 / 30 | 66%-93% | 8.0 | $0.130 | 60 s |
+| Put the red cube in the box | SO-ARM101 | 21 / 30 | 52%-83% | | | |
+| Stack red on blue | SO-ARM101 | 18 / 30 | 42%-75% | | | |
+
+* **Franka Panda: 142 / 150 (94.7%, 95% CI 89.8%-97.3%).** In every miss the arm finished its plan but the object
+  did not end up in place.
+* **SO-ARM101: 39 / 60 (65%).** Most failures are the arm timing out on its approach to the cube. With the scripted
+  planner the same arm solves 98 / 100, so the gap is in Claude's plans and pointing for the small arm, not in the
+  controllers.
+* About a minute per task is model latency (roughly 8 calls of 7.6 s); the robot motion itself is about 9 s.
+* The whole run (210 episodes) cost about $32. Cost is computed from token counts at list price.
+
+### Scripted reference planner, 50 seeds per task
+
+The scripted planner replaces Claude with a hand-written plan and simulated pointing noise (6 px, 1 px after
+refinement), so it measures grounding, control and execution without planning: **348 / 350** across the same seven
+set-ups (Franka 250 / 250, SO-ARM101 98 / 100).
+
+Raw summaries: [docs/trials_claude.md](docs/trials_claude.md), [docs/trials_scripted.md](docs/trials_scripted.md).
+Reproduce:
+
 ```bash
-uv venv .venv --python 3.11 && uv pip install --python .venv/bin/python -e ".[dev]"
-cp .env.example .env        # then fill in AWS credentials (or AWS_BEARER_TOKEN_BEDROCK)
+.venv/bin/python scripts/run_trials.py --llm scripted --seeds 50     # free, about 2 minutes
+.venv/bin/python scripts/run_trials.py --llm bedrock  --seeds 30     # paid Bedrock calls, about 45 minutes
 ```
-Model: Claude Sonnet 4.5 through the cross-region inference profile
-`us.anthropic.claude-sonnet-4-5-20250929-v1:0` (edit `configs/bedrock.yaml`, or pass `--model`; use the
-`global.` prefix if that is what your account has enabled). Bedrock model access for Sonnet 4.5 must be enabled.
 
-## Run
+## Quick start
+
+### In the browser
+
+Open https://dooms-inference.vercel.app, press **Run the demo**. To plan with Claude, open the studio, click
+**Connect Claude** and add one of:
+
+* a **Claude API key** (calls go to `api.anthropic.com`; Claude Opus 5.5, Sonnet 5.5 or Haiku 5.5), or
+* **Amazon Bedrock** credentials: AWS access keys or a Bedrock API key (Claude Sonnet 4.5).
+
+Requests go from your browser straight to the provider you chose and are billed to you. Keys stay in the browser
+tab (or in browser storage if you tick *Remember on this device*) and are never sent to a Dooms server.
+
+### Python
+
 ```bash
-# no AWS needed: scripted reference plan + simulated noisy VLM pointing (exercises the whole stack)
+uv venv .venv --python 3.11 && uv pip install --python .venv/bin/python -e ".[dev,web]"
+cp .env.example .env        # AWS credentials (or AWS_BEARER_TOKEN_BEDROCK); only needed for --llm bedrock
+
+# no AWS needed: scripted reference plan + simulated noisy pointing (exercises the whole stack)
 .venv/bin/python scripts/run_task.py --task put_bottle_in_box --seed 0 --llm scripted
 
 # real agents on Bedrock
 .venv/bin/python scripts/run_task.py --task put_bottle_in_box --seed 0 --llm bedrock
 
-# benchmark: tasks x seeds x ablations  ->  runs/bench_bedrock/{episodes.jsonl,summary.md,summary.csv,success_rate.png}
+.venv/bin/python -m pytest -q
+```
+
+The Python stack uses Claude Sonnet 4.5 through the cross-region inference profile
+`us.anthropic.claude-sonnet-4-5-20250929-v1:0`. Edit `configs/bedrock.yaml` or pass `--model`; use the `global.`
+prefix if that is what your account has enabled. Model access for Sonnet 4.5 must be enabled in Bedrock.
+
+Each episode writes `scene.png`, `plan_*.json` (subtasks, recipes, parameters), `*_grounding.png` (the points the
+model picked), `transcript.json` (every agent answer), `result.json` and `video.mp4` under its run directory.
+
+## Browser engine
+
+The web UI runs the whole stack in the page: MuJoCo compiled to WebAssembly, the controllers, the four agents and
+the vision grounder live in a web worker (`web/engine/`, a TypeScript port of the Python stack). Claude is called
+from the worker with the visitor's own credentials, through `@anthropic-ai/sdk` for a Claude API key or a SigV4-signed
+Bedrock Converse call. The skill library is kept in IndexedDB. Hosting is static files.
+
+```bash
+npm install && npm run build      # bundles web/ -> src/dooms/server/static/engine/ (committed; rebuild after editing web/)
+npm run typecheck
+npm run prompts                   # regenerate web/engine/prompts.ts after editing src/dooms/llm/prompts/*.md
+.venv/bin/python scripts/serve.py # http://127.0.0.1:8000  (--port N if 8000 is busy)
+```
+
+* `/` is the project page; the studio is `/static/studio.html`.
+* The Python server is only needed for a **real robot** (a web page cannot reach a USB arm). The UI talks to it over
+  a WebSocket in that mode alone, and real-robot runs plan through Bedrock.
+* Robot assets for the browser are slimmed copies under `src/dooms/server/static/dooms/`.
+* Deploying: `vercel.json` builds the engine and publishes the static UI (`scripts/vercel_build.py`). No backend or
+  environment variable is required; `DOOMS_API_URL` is optional and only points the UI at a real-robot server.
+
+### The studio
+
+A command panel (task, robot, scene, planner), a live 3D view with the agents' camera as an inset, and tabs for the
+agent pipeline, the skill library and an activity log with cost and token counts.
+
+* Planner **Demo** needs no account and understands "put X into/on Y" for the scene's objects. Planner **Claude**
+  takes any wording.
+* Grounding **Oracle** uses simulator truth; **Vision** has Claude point at the camera image.
+* **The scene is a persistent session.** Run "put the bottle into the box", then "put the blue cube into the box":
+  the second command starts with the bottle already in the box. The world only changes when you reset the scene,
+  change the scene or change the seed. Stop aborts the running command and leaves the world as it is.
+* The 3D viewer loads three.js from a CDN, so the browser needs internet access.
+
+## Skills, obstacles, fallen objects
+
+* **Skill library** (`skills/library/*.json` in Python, IndexedDB in the browser): a skill is a reusable recipe with
+  roles (`obj`, `dest`, ...) instead of object names, e.g. `grasp_from_above`. For every subtask the Composer sees the
+  stored skills and either reuses one or defines a new one. New skills are saved only after a successful run; reused
+  ones keep success counts and the numbers that worked, offered to the Tuner as hints. CLI: `--skills DIR|none`.
+* **Open-vocabulary keypoints**: the Composer may define any keypoint with a description (a free spot on the table,
+  the far end of a lying bottle) and the Spotter points at it. Directions between two keypoints (`A__to__B`) are
+  usable as task axes.
+* **Obstacle analysis**: before acting, a depth-based clearance check (`perception/clearance.py`) measures whether
+  the open fingers would hit a neighbouring object at each grasp target. If blocked, the Scout gets the measurement,
+  decides how to clear it (for example pushing the box away with the closed gripper) and the original task is
+  planned again from the new scene.
+* **Fallen objects and infeasible tasks**: the Scout describes object states first. A lying bottle is grasped across
+  its width; if the task cannot be done with a top-down parallel gripper it says so instead of trying.
+* Scenes: `sandbox`, `sandbox_fallen` (bottle knocked over), `sandbox_blocked` (box right beside a lying bottle),
+  `put_bottle_in_box`, `put_cube_in_box`, `stack_cubes`. Add one by dropping a YAML in `configs/tasks/`.
+
+The harder scenes (`sandbox_fallen`, `sandbox_blocked`) are not in the results above; in small exploratory runs with
+Claude they still fail some of the time.
+
+## Benchmarking
+
+`scripts/run_trials.py` runs N seeds of several set-ups (scene, arm, command) in parallel and reports the success
+count of each; it is what produced the tables above. `scripts/run_benchmark.py` adds ablations:
+
+```bash
 .venv/bin/python scripts/run_benchmark.py --llm bedrock --seeds 20 \
     --tasks put_bottle_in_box put_cube_in_box stack_cubes \
     --variants baseline oracle_grounding no_refine no_retry no_decomposer
-
-.venv/bin/python -m pytest -q
 ```
-Each episode writes `scene.png`, `plan_*.json` (subtasks, recipes, parameters), `*_grounding.png` (points the VLM
-picked), `transcript.json` (every agent answer), `result.json`, `video.mp4` under its run directory.
 
-## Browser engine (no server needed)
-The web UI runs the whole thing **in the browser**: MuJoCo compiled to WebAssembly, the controllers, the four agents and
-the vision grounder live in a web worker (`web/engine/`, TypeScript, a TypeScript port of the Python stack). Claude is called straight from the page with the visitor's own credentials: a Claude API key
-(`@anthropic-ai/sdk`, api.anthropic.com) or Amazon Bedrock (AWS keys, SigV4 signed with WebCrypto, or a Bedrock API key), and the skill library is kept in IndexedDB. Hosting it is just static files.
-
-```bash
-npm install && npm run build      # bundles web/ -> src/dooms/server/static/engine/ (committed, rebuild after editing web/)
-npm run typecheck
-npm run prompts                   # regenerate web/engine/prompts.ts after editing src/dooms/llm/prompts/*.md
-.venv/bin/python scripts/serve.py   # serves the UI; the simulation itself runs in the page
-```
-The Python server is only needed for a **real robot** (a web page cannot reach a USB arm); the UI talks to it over a
-WebSocket in that mode alone. Robot assets for the browser are slimmed copies under `static/dooms/`.
-
-## Web UI (type a command, watch the sim)
-The page is a small studio: **command panel** (task, scene, planner, advanced options) · **live 3D simulation** with the
-agents' camera as an inset and a step-by-step progress bar · **tabs** for the agent pipeline, the skill library and an
-activity log with cost/token metrics.
-
-**Bring your own AWS account.** Click *Connect AWS* (top right), paste IAM access keys (optionally a session token) or an
-Amazon Bedrock API key, pick a region and press *Validate & connect*. The server checks the credentials, lists the Claude
-models the account can use and lets you choose one. Keys are kept in memory for your session (optionally in your browser
-storage if you tick *Remember on this device*), are sent only with your own run requests, and are never written to disk or
-logs. For a hosted deployment set `DOOMS_REQUIRE_USER_KEYS=1` so the server's own credentials are never used, and serve it
-over HTTPS. Use an IAM user limited to `bedrock:InvokeModel` and `bedrock:ListInferenceProfiles`.
-
-```bash
-.venv/bin/python scripts/serve.py            # then open http://127.0.0.1:8000  (--port N if 8000 is busy)
-```
-Pick a scene (`sandbox` has a bottle, a box, a red and a blue cube), type a command or click an example, press
-Run. The main view is a **live 3D scene** (three.js): the server streams the pose of every body 50x per second
-and the browser draws the real Panda meshes, so you can orbit / pan / zoom while the robot moves. Orange markers
-show where the Vision Grounder put each keypoint (with its surface normal); the small inset is the agents' camera
-image. The side panels fill in live: decomposed subtasks, controller recipes (with the chosen numbers), parameters,
-grounding overlay, LLM calls / tokens / cost, and the final verdict. Planner **Demo** needs no AWS and understands
-"put X into/on Y" for the scene's objects; planner **Claude · Bedrock** takes any wording (needs credentials in
-`.env`). Grounding **Oracle** uses simulator truth. The speed selector paces the sim (max = as fast as possible).
-**The scene is a persistent session**: each browser tab gets its own simulator process, and the world state is
-kept between commands. Run "put the bottle into the box", then "put the blue cube into the box": the second
-command starts with the bottle already in the box (the arm first returns home). The scene only changes when you
-press **↺ Reset scene**, change the scene, or change the seed. Stop aborts the running command and leaves the
-world as it is. If the destination tray is already occupied, grounding aims at its free floor; gripper clearance
-in a crowded tray is limited, so a neighbouring object can occasionally get nudged.
-The 3D viewer loads three.js from a CDN, so the browser needs internet access. The server binds to 127.0.0.1
-only and runs one episode at a time, each in its own process.
-
-## Skills, obstacles, fallen objects
-* **Skill library** (`skills/library/*.json`, starts empty): a skill is a reusable recipe with roles (`obj`, `dest`, ...)
-  instead of object names, e.g. `grasp_from_above`. For every subtask the Skill Generator sees the stored skills and
-  either reuses one or defines a new one; new skills are saved only after a successful run, reused ones keep
-  success counts and the numbers that worked (offered to the Parameter Setter as hints). Shown on the web page
-  (Skills: Learn + reuse / Off; "clear" deletes them). CLI: `--skills DIR|none`. Ablation: `no_skill_library`.
-* **Open vocabulary keypoints**: the Skill Generator may define any keypoint with a description (a free spot on the
-  table, the far end of a lying bottle...); the Vision Grounder points at it. Directions between two keypoints
-  (`A__to__B`) are usable as task axes.
-* **Obstacle analysis**: before acting, a depth-based clearance check (`perception/clearance.py`) measures whether the
-  open fingers would hit a neighbouring object at each grasp target. If blocked, the Task Decomposer receives the
-  measurement (world coordinates, size, side), decides how to clear it (e.g. push the box away with the closed
-  gripper, built from the same controllers) and the original task is planned again from the new scene.
-  The planning agents see the world axes drawn on the image. The box is a free body (0.65 kg) so it can be pushed.
-* **Fallen objects / infeasible tasks**: the Task Decomposer describes object states first; a lying bottle is grasped
-  across its width; if the task cannot be done with a top-down parallel gripper it says so instead of trying.
-* Scenes: `sandbox`, `sandbox_fallen` (bottle knocked over), `sandbox_blocked` (box right beside a lying bottle).
-
-## Metrics
-success rate (Wilson 95% CI), subtask completion, replans, LLM calls / tokens / cost / latency, sim + wall time,
-mean grounding error vs simulator ground truth (mm). Ablations (`bench/ablations.py`): `oracle_grounding`
-(simulator keypoints), `no_refine` (no zoom pass), `no_retry`, `no_decomposer`.
-
-## Layout
-`src/dooms/`: `llm/` (Bedrock client, schemas, prompts) · `agents/` (the 4 agents) · `pipeline.py` ·
-`controllers/` (task-axis controllers, priority stack) · `perception/` (back-projection, keypoints, tracking) ·
-`sim/` (MuJoCo env, Panda scene builder) · `execution/` (compiler, runtime, robot interface) · `monitor.py` ·
-`bench/` · `server/` (FastAPI + WebSocket + `static/index.html`). Add a task by dropping a YAML in `configs/tasks/`.
-
-## Design notes
-* Keypoints are grounded **once per plan** from a clean initial image, then tracked: after the gripper closes,
-  keypoints near the tcp follow the end-effector kinematically (no need to see through the gripper); on release
-  they freeze. Grounding is coarse VLM pointing, a zoomed refinement, then depth lift + plane fit.
-* **Precision loop** (the main accuracy lever): grasping needs the target to ~5 mm, so grounding is coarse-to-fine -
-  scene camera (coarse point, zoomed refinement, depth + plane fit), then a **wrist-camera close-up** once the gripper
-  hovers above a reach target. If a subtask fails, the pipeline first does *targeted feedback* (go home, look again
-  with a little sampling variation, re-run the same plan; `max_regrounds`), and only then a full LLM replan.
-  Ablations: `no_wrist_refine`, `no_regrounding`.
-* The runtime stacks controllers by priority with exact null-space projection; a posture task keeps the arm near home.
-* On failure (timeout / missed grasp / dropped object) the monitor triggers a retry, then a replan from the
-  current scene (arm returns home first).
-* Swapping simulator/robot: implement `sim.base.RobotInterface` / `SimEnv`.
-
-## Jev advisor (optional)
-Two small decisions in the pipeline can be made by a typed-decision model, [Jev](https://typesafe.ai) ("System One",
-by TypeSafe AI), instead of the hand-written rules: *did this subtask succeed* (yes/no with a probability) and *which
-recovery after a failure* (`reground` / `replan` / `give_up`). Jev returns typed answers with a confidence, not text,
-so low-confidence answers fall back to the rules. Code: `src/dooms/advisor.py`, `src/dooms/llm/jev_client.py`.
-
-```bash
-# .env: JEV_AI_API_KEY=...   (server-side only; keys come from https://jev-ai.pro/jev-api)
-.venv/bin/python scripts/check_jev.py                 # one tiny call, prints the raw response
-```
-Set `pipeline.advisor` in `configs/default.yaml`: `rules` (default, no network) | `monitor` | `recovery` | `both` |
-`shadow` (rules decide, Jev's answer is only logged, so one real run gives rule-vs-Jev agreement at no risk).
-`jev.min_confidence` keeps the rule answer below that confidence. The client retries only 429/502/503 (honouring
-`Retry-After`) and never resends after a timeout or 504, whose outcome is uncertain.
-
-### Benchmarking the decisions
-`scripts/bench_jev_decisions.py [--repeat N]` is an offline benchmark that needs no simulator: it scores Jev against the
-rule-based advisor (and Claude with `--claude`, which makes paid Bedrock calls) on labelled cases. The 12 recovery cases
-are hand-labelled failure texts; the verdict cases replay recorded subtask logs plus perturbed copies with a known label
-(grasp closed on nothing, object dropped, ...). It reports accuracy, latency and cost per decision. One pass is about 33
-small calls (roughly 14k tokens); the labels are small and subjective, so treat the numbers as a sanity check, not a
-leaderboard.
-
-## Status
-* **Scripted stand-in for the LLM** (simulated 6 px / 1 px pointing noise): 12/12 bottle→box, 12/12 cube→box, 11/12 stacking.
-* **Live Claude on Bedrock** (Sonnet 4.5, `runs/bench_claude`): 15/15 episodes succeeded
-  (5 seeds each of bottle→box, cube→box and stack cubes), on average 8 LLM calls and about $0.11 per episode.
-  Small sample, simulation only.
-* **Jev advisor:** integrated and smoke-tested against the live API, but the offline decision benchmark
-  (`scripts/bench_jev_decisions.py`) has not been completed yet, so there are no accuracy numbers for Jev vs the rules.
-* The real SO-101 path is covered by tests and a virtual servo rig; results on physical hardware are not reported here.
+Metrics: success rate (Wilson 95% CI), subtask completion, replans, model calls, tokens, cost and latency, sim and
+wall time, mean grounding error against simulator ground truth (mm). Ablations (`bench/ablations.py`):
+`oracle_grounding`, `no_refine`, `no_retry`, `no_decomposer`, `no_wrist_refine`, `no_regrounding`,
+`no_skill_library`.
 
 ## Robots
-
-The simulator can drive two arms, chosen in the UI (or `--robot` on `scripts/run_task.py`):
 
 | Robot | Joints | Gripper | Force sensor | Scenes |
 | --- | --- | --- | --- | --- |
 | Franka Panda | 7 | parallel, 8 cm | yes | all |
 | SO-ARM101 | 5 | one moving jaw, 5.5 cm | no | Sandbox, Bottle → box, Cube → box, Stack cubes |
 
-Each arm has a profile in `src/dooms/robots.py` (object scale, workspace, gripper, prompt text). The SO-ARM101 works on a
-smaller table with smaller objects, keeps every height within a few centimetres (its top-down reach ends near 8 cm) and
-lowers objects by height instead of by contact force. Each arm keeps its own skill library (`skills/library` for the Franka,
-`skills/library-<robot>` for the others) because stored parameter defaults only fit the arm that learned them.
+Choose the arm in the UI or with `--robot` on `scripts/run_task.py`. Each arm has a profile in
+`src/dooms/robots.py` (object scale, workspace, gripper, prompt text). The SO-ARM101 works on a smaller table with
+smaller objects, keeps every height within a few centimetres and lowers objects by height instead of by contact
+force. Each arm keeps its own skill library, because stored parameter defaults only fit the arm that learned them.
 
-## Real robot (SO-101)
+### Real robot (SO-101)
 
-The SO-101 can also be driven for real: **Robot: SO101 → Mode: Real robot → Set up**. A five-step wizard connects the arm
-over USB, calibrates it (reference pose, joint directions, range), opens an overview camera (USB webcam or a phone used as
-a webcam) and calibrates it by touching 6 tape marks. Safety layers (joint limits, speed cap, table guard, collision
-detection, temperature and voltage watchdogs, Stop/Esc to hold) are always on. Pick **Virtual SO-101** as the port to try
-every step on a simulated arm that speaks the same servo protocol. Full guide with pictures:
-[docs/real-robot/README.md](docs/real-robot/README.md) (also served in the app at `/static/guide/`).
+**Robot: SO101 → Mode: Real robot → Set up** in the studio served by `scripts/serve.py`. A five-step wizard connects
+the arm over USB, calibrates it, opens an overview camera and calibrates that by touching 6 tape marks. Safety
+layers (joint limits, speed cap, table guard, collision detection, temperature and voltage watchdogs, Stop/Esc to
+hold) are always on. Pick **Virtual SO-101** as the port to try every step on a simulated arm that speaks the same
+servo protocol. Guide with pictures: [docs/real-robot/README.md](docs/real-robot/README.md).
 
-Code: `src/dooms/hardware/` (Feetech bus protocol, arm driver + calibration, camera + camera calibration, the pipeline's
-real-robot environment, the setup session, and the virtual rig used for testing). Tests: `tests/test_hardware.py`.
+The real path is covered by tests and the virtual servo rig; no results on physical hardware are reported.
+Code: `src/dooms/hardware/`. Tests: `tests/test_hardware.py`.
+
+## Jev advisor (optional)
+
+Two small decisions can be made by a typed-decision model, [Jev](https://typesafe.ai) (TypeSafe AI), instead of the
+hand-written rules: *did this subtask succeed* and *which recovery after a failure* (`reground` / `replan` /
+`give_up`). Jev returns typed answers with a confidence, so low-confidence answers fall back to the rules.
+
+```bash
+# .env: JEV_AI_API_KEY=...   (keys come from https://jev-ai.pro/jev-api)
+.venv/bin/python scripts/check_jev.py                 # one tiny call, prints the raw response
+.venv/bin/python scripts/bench_jev_decisions.py       # offline: Jev vs the rules on labelled cases
+```
+
+Set `pipeline.advisor` in `configs/default.yaml`: `rules` (default, no network) | `monitor` | `recovery` | `both` |
+`shadow` (rules decide, Jev's answer is only logged). Code: `src/dooms/advisor.py`, `src/dooms/llm/jev_client.py`.
+
+Status: integrated and smoke-tested, but the decision benchmark has not been completed, so there are no accuracy or
+latency numbers for Jev yet.
+
+## Repository layout
+
+| Path | What is there |
+| --- | --- |
+| `src/dooms/` | Python stack: `agents/`, `llm/` (Bedrock client, schemas, prompts), `pipeline.py`, `controllers/`, `perception/`, `sim/`, `execution/`, `monitor.py`, `bench/`, `hardware/`, `server/` |
+| `web/engine/` | Browser engine in TypeScript: simulator wrapper, controllers, agents, Claude API and Bedrock clients |
+| `src/dooms/server/static/` | Project page (`index.html`), studio (`studio.html`, `app.js`), built engine, browser robot assets |
+| `configs/` | Pipeline defaults, Bedrock config, task YAMLs |
+| `scripts/` | `run_task.py`, `run_trials.py`, `run_benchmark.py`, `serve.py`, Jev and Bedrock checks |
+| `skills/` | Skill libraries, one per arm |
+| `docs/` | Architecture notes, trial summaries, real-robot guide |
+| `tests/` | `pytest` suite |
 
 ## License
-Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE) (the robot models under `src/dooms/sim/scenes/assets/` keep
-their own Apache-2.0 licenses).
+
+Apache-2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). The robot models under `src/dooms/sim/scenes/assets/` and
+`src/dooms/server/static/dooms/` (Franka Panda from MuJoCo Menagerie, SO-ARM101 from The Robot Studio) keep their own
+Apache-2.0 licenses.
