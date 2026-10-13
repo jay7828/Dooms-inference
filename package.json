@@ -1,0 +1,20 @@
+{
+  "name": "dooms-inference-web",
+  "private": true,
+  "type": "module",
+  "description": "The in-browser Dooms engine (MuJoCo WASM + the agent pipeline) bundled for the static web UI.",
+  "scripts": {
+    "build:engine": "node web/build.mjs",
+    "typecheck": "tsc -p web/tsconfig.json",
+    "prompts": "node web/build_prompts.mjs",
+    "build": "node web/build.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "esbuild": "0.25.10",
+    "typescript": "5.9.3"
+  }
+}

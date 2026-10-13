@@ -1,8 +1,12 @@
-// Dooms studio — UI logic. Talks to the server over one WebSocket (events + live poses) and a few REST endpoints.
+// Dooms studio — UI logic. The simulator and the agent pipeline run in this browser (a web worker: MuJoCo WASM +
+// the four agents, Claude is called straight from the page with the user's own AWS credentials). A Dooms server is only
+// needed for a real robot (USB arm + camera): it is reached over a WebSocket and only in that mode.
 import { createViewer } from "/static/viewer.js";
 import { createRobot } from "/static/robot.js";
+import { LocalSession, localConfig, localEngineSupported, localSkills, clearLocalSkills, validateInBrowser } from "/static/engine/client.js";
 
-const API = (window.DOOMS_API || "").replace(/\/$/, ""); // "" = same origin; set in config.js when the UI is hosted apart from the backend
+const API = (window.DOOMS_API || "").replace(/\/$/, ""); // optional Dooms server (real robots only): "" = same origin
+const BASE = "/static";                                  // where engine/, dooms/ and vendor/mujoco/ are served
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -18,7 +22,7 @@ const I = {
 
 /* ------------------------------------------------------------------ state */
 const S = {
-  ws: null, cfg: null, scenes: {}, running: false, scene: "sandbox", robot: "franka", mode: "sim", planner: "scripted", grounding: "vlm", speed: "1",
+  ws: null, engine: null, engineReady: null, cfg: null, server: null, scenes: {}, running: false, scene: "sandbox", robot: "franka", mode: "sim", planner: "scripted", grounding: "vlm", speed: "1",
   aws: null,                       // {mode, creds, region, model, identity} once validated
   run: null, frameUrl: null, t0: 0,
 };
@@ -83,8 +87,9 @@ function setMode(m) {
   $("#btn-reset").hidden = isReal; $("#seed").closest(".prow").hidden = isReal;
   if (isReal && S.planner === "scripted" && RB.status.connected && !RB.status.virtual) { S.planner = "bedrock"; segPlanner.set("bedrock"); renderPlannerNote(); }
   resetRun(); loadScene();
-  if (!isReal && S.ws?.readyState === 1) S.ws.send(JSON.stringify({ type: "load", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 }));
-  if (isReal && realAvailable()) { RB.refresh(); RB.renderBar(); }
+  setConn(isReal ? S.ws?.readyState === 1 : !!S.engineOn, isReal ? "Dooms server" : "Simulator (runs in your browser)");
+  if (!isReal) S.engine?.send({ type: "load", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 });
+  if (isReal && realAvailable()) { connectServer(); RB.refresh(); RB.renderBar(); }
 }
 function renderModeRow() { $("#row-mode").hidden = S.robot !== "so101" || !(S.cfg.real_robots || []).includes("so101"); }
 
@@ -102,8 +107,10 @@ function saveAws(remember) {
     if (S.aws) (remember ? localStorage : sessionStorage).setItem(AWS_KEY, JSON.stringify({ ...S.aws, remember }));
   } catch { /* storage blocked: keep in memory only */ }
 }
+// the server's own AWS credentials only exist for real-robot runs, which the server executes
+const serverKeys = () => real() && !!S.server?.bedrock_ready && !S.server?.require_user_keys;
 function renderAwsChip() {
-  const chip = $("#btn-aws"), server = S.cfg?.bedrock_ready && !S.cfg?.require_user_keys;
+  const chip = $("#btn-aws"), server = serverKeys();
   chip.classList.toggle("ok", !!S.aws || server);
   $("#aws-label").innerHTML = S.aws ? `AWS <small>${esc(S.aws.identity || "connected")}</small>` : server ? "AWS <small>server key</small>" : "Connect AWS";
   renderPlannerNote();
@@ -113,7 +120,7 @@ function renderPlannerNote() {
   if (S.planner !== "bedrock") { el.innerHTML = ""; return; }
   if (S.aws) {
     el.innerHTML = `<div class="callout ok">${I.check}<div>Your AWS account · ${esc(S.aws.region)}<br><span class="hint">${esc(S.aws.model.replace(/^(us|global|eu|apac)\.anthropic\./, ""))}</span></div></div>`;
-  } else if (S.cfg?.bedrock_ready && !S.cfg?.require_user_keys) {
+  } else if (serverKeys()) {
     el.innerHTML = `<div class="callout">${I.info}<div>Using the server's AWS credentials. <a href="#" id="use-own" style="color:var(--accent-h)">Use mine</a></div></div>`;
     $("#use-own").onclick = (e) => { e.preventDefault(); openAws(); };
   } else {
@@ -162,9 +169,7 @@ $("#aws-form").addEventListener("submit", async (e) => {
   const btn = $("#aws-validate"); btn.disabled = true;
   setAwsStatus("busy", "Checking credentials and Claude access…");
   try {
-    const r = await fetch(API + "/api/bedrock/validate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ credentials: creds, model: $("#aws-model").value || null }) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || "Validation failed");
+    const d = await validateInBrowser(creds, $("#aws-model").value || null);
     if (!d.ok) return setAwsStatus("bad", d.message || "Could not connect.");
     const model = d.tested_model;
     S.aws = { mode, creds, region: d.region, model, models: d.models, identity: d.identity || "connected" };
@@ -226,17 +231,26 @@ $("#opt-toggle").onclick = () => { const o = $("#options"); o.hidden = !o.hidden
 async function loadScene() {
   $("#loading").style.display = "grid";
   try {
-    const sc = await (await fetch(API + `/api/scene/${S.scene}?seed=${+$("#seed").value || 0}&robot=${S.robot}${real() ? "&mode=real" : ""}`)).json();
+    const seed = +$("#seed").value || 0;
+    let sc;
+    if (real()) {
+      const r = await fetch(API + `/api/scene/${S.scene}?seed=${seed}&robot=${S.robot}&mode=real`);
+      if (!r.ok) throw new Error("scene");
+      sc = await r.json();
+    } else {
+      await S.engineReady;
+      sc = await S.engine.scene(S.scene, seed, S.robot);
+    }
     V.setDefaultView(sc.view);
     V.buildScene(sc);
     $("#loading").style.display = "none";
-  } catch (e) { $("#loading").textContent = "Could not load the 3D scene."; }
+  } catch (e) { $("#loading").textContent = String(e?.message || "").length > 4 ? e.message : "Could not load the 3D scene."; }
 }
 function resetScene() {
   if (S.running) return;
   resetRun(); loadScene();
   if (real()) return;                              // a real table is arranged by hand
-  if (S.ws?.readyState === 1) S.ws.send(JSON.stringify({ type: "reset", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 }));
+  S.engine?.send({ type: "reset", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 });
 }
 function showSceneState(ev) {
   const el = $("#scene-state"), dirty = ev.runs > 0;
@@ -309,8 +323,9 @@ function renderSkills(list) {
   $("#skills-list").innerHTML = list.length ? list.map((s) => `<details class="skill"><summary><b>${esc(s.name)}</b><span class="st">${s.successes}/${s.uses} ok</span></summary><p>${esc(s.description)}</p><pre class="code">roles: ${esc(s.roles.join(", ") || "—")}\n${s.controllers.map(esc).join("\n")}</pre></details>`).join("")
     : `<div class="empty">No skills yet</div>`;
 }
-async function loadSkills() { try { renderSkills(await (await fetch(API + "/api/skills?robot=" + S.robot)).json()); } catch { /* ignore */ } }
-$("#btn-clearskills").onclick = async () => { if (confirm("Delete all stored skills?")) { await fetch(API + "/api/skills?robot=" + S.robot, { method: "DELETE" }); loadSkills(); } };
+// the skill library of each arm lives in this browser (IndexedDB)
+async function loadSkills() { try { renderSkills(await localSkills(S.robot)); } catch { /* ignore */ } }
+$("#btn-clearskills").onclick = async () => { if (confirm("Delete all stored skills?")) { await clearLocalSkills(S.robot); loadSkills(); } };
 
 /* ------------------------------------------------------------------ event stream */
 function handle(ev) {
@@ -400,9 +415,9 @@ function setRunning(v) {
   $$("#scene, #seg-robot button, #seg-mode button, #seg-planner button, #seg-grounding button, #dry-run").forEach((x) => (x.disabled = v));
 }
 function start() {
-  if (!S.ws || S.ws.readyState !== 1) return toast("err", "Not connected", "The server connection is down. Retrying…");
+  if (real() ? S.ws?.readyState !== 1 : !S.engineOn) return toast("err", real() ? "Not connected" : "Simulator not ready", real() ? "The server connection is down. Retrying…" : "The in-browser simulator is still starting.");
   if (!V.ready) return toast("info", "Still loading", "The 3D scene is not ready yet.");
-  if (S.planner === "bedrock" && !S.aws && !(S.cfg.bedrock_ready && !S.cfg.require_user_keys)) { openAws(); return toast("info", "Connect AWS first", "Add your credentials to use Claude."); }
+  if (S.planner === "bedrock" && !S.aws && !serverKeys()) { openAws(); return toast("info", "Connect AWS first", "Add your credentials to use Claude."); }
   if (real() && !realAvailable()) return toast("info", "Use the desktop app", S.cfg.real_robot.reason);
   if (real()) {
     if (!RB.ready()) { RB.open(); return toast("info", "Finish the robot setup", "Connect, calibrate the arm and the camera first."); }
@@ -422,47 +437,74 @@ function launch() {
   const msg = { type: "run", scene: S.scene, robot: S.robot, instruction: $("#task").value.trim(), llm: S.planner, grounding: S.grounding, speed: +S.speed, skills: $("#skills").checked, seed: +$("#seed").value || 0 };
   if (S.planner === "bedrock" && S.aws) { msg.credentials = { ...S.aws.creds }; msg.model = S.aws.model; }
   if (real()) { msg.mode = "real"; msg.dry_run = $("#dry-run").checked; }
-  S.ws.send(JSON.stringify(msg));
+  if (real()) S.ws.send(JSON.stringify(msg)); else S.engine.send(msg);
 }
 $("#run").onclick = () => {
   if (!S.running) return start();
-  S.ws.send(JSON.stringify({ type: "stop" }));
+  if (real()) S.ws?.send(JSON.stringify({ type: "stop" })); else S.engine?.send({ type: "stop" });
   const b = $("#run"); b.disabled = true; b.querySelector("span").textContent = "Stopping…";   // until the server confirms
 };
 
-function connect() {
+function autorun() {
+  const q = new URLSearchParams(location.search); // ?autorun=1&scene=&cmd=&speed=&seed=&planner=  (demos / tests)
+  if (!q.has("autorun") || window.__ran) return;
+  window.__ran = true;
+  if (q.get("scene")) { S.scene = q.get("scene"); renderScenes(); fillExamples(true); }
+  if (q.get("seed")) $("#seed").value = q.get("seed");
+  if (q.get("speed")) { S.speed = q.get("speed"); segSpeed.set(S.speed); }
+  if (q.get("planner")) { S.planner = q.get("planner"); segPlanner.set(S.planner); renderPlannerNote(); }
+  if (q.get("cmd")) $("#task").value = q.get("cmd");
+  resetScene();
+  const go = () => (V.ready ? start() : setTimeout(go, 200));
+  setTimeout(go, 500);
+}
+const setConn = (on, title) => { $("#conn").classList.toggle("on", on); $("#conn").title = title; };
+let lastSimLabel = 0;
+function onPose(t, poses) {
+  if (V.ready) V.applyPoses(poses);
+  const now = performance.now();
+  if (now - lastSimLabel > 100) { lastSimLabel = now; $("#pill-sim").textContent = `t = ${t.toFixed(1)} s`; if (S.running) $("#m-sim").textContent = t.toFixed(1) + " s"; }
+}
+function onFrame(blob, fromRobot) {
+  const url = URL.createObjectURL(blob), old = S.frameUrl;
+  $("#frame").src = url; S.frameUrl = url; if (fromRobot) RB.frame(url); if (old) setTimeout(() => URL.revokeObjectURL(old), 2000);
+}
+
+/** The in-browser simulator + agent pipeline (a web worker). */
+function connectEngine() {
+  if (!localEngineSupported()) {
+    S.engineReady = Promise.reject(new Error("This browser cannot run the simulator (Web Workers and WebAssembly are required)."));
+    S.engineReady.catch(() => {});
+    $("#loading").textContent = "This browser cannot run the simulator (Web Workers and WebAssembly are required).";
+    return;
+  }
+  let ok, bad;
+  S.engineReady = new Promise((a, b) => { ok = a; bad = b; });
+  S.engineReady.catch(() => {});
+  S.engine = new LocalSession({
+    base: BASE,
+    onReady: () => { S.engineOn = true; setConn(true, "Simulator ready (runs in your browser)"); ok(); },
+    onFatal: (m) => { S.engineOn = false; setConn(false, m); bad(new Error(m)); toast("err", "Simulator stopped", m); $("#loading").style.display = "grid"; $("#loading").textContent = m; setRunning(false); },
+    onEvent: (ev) => { if (!real()) handle(ev); },
+    onPose: (t, poses) => { if (!real()) onPose(t, poses); },
+    onFrame: (blob) => { if (!real()) onFrame(blob, false); },
+  });
+  S.engine.start();
+}
+
+/** The optional Dooms server: only for real robots (USB arm and camera), reached over a WebSocket. */
+function connectServer() {
+  if (S.ws || !realAvailable()) return;
   const ws = (S.ws = new WebSocket((API ? API.replace(/^http/, "ws") : (location.protocol === "https:" ? "wss://" : "ws://") + location.host) + "/ws"));
   ws.binaryType = "arraybuffer";
-  ws.onopen = () => {
-    $("#conn").classList.add("on"); $("#conn").title = "Connected";
-    if (!real()) ws.send(JSON.stringify({ type: "load", scene: S.scene, robot: S.robot, seed: +$("#seed").value || 0 }));
-    else if (realAvailable()) RB.refresh();
-    const q = new URLSearchParams(location.search); // ?autorun=1&scene=&cmd=&speed=&seed=&planner=  (demos / tests)
-    if (q.has("autorun") && !window.__ran) {
-      window.__ran = true;
-      if (q.get("scene")) { S.scene = q.get("scene"); renderScenes(); fillExamples(true); }
-      if (q.get("seed")) $("#seed").value = q.get("seed");
-      if (q.get("speed")) { S.speed = q.get("speed"); segSpeed.set(S.speed); }
-      if (q.get("planner")) { S.planner = q.get("planner"); segPlanner.set(S.planner); renderPlannerNote(); }
-      if (q.get("cmd")) $("#task").value = q.get("cmd");
-      resetScene();
-      const go = () => (V.ready ? start() : setTimeout(go, 200));
-      setTimeout(go, 500);
-    }
-  };
-  ws.onclose = () => { $("#conn").classList.remove("on"); $("#conn").title = "Reconnecting…"; setRunning(false); setTimeout(connect, 1500); };
+  ws.onopen = () => { if (real()) { setConn(true, "Connected to the Dooms server"); RB.refresh(); } };
+  ws.onclose = () => { S.ws = null; if (real()) { setConn(false, "Reconnecting…"); setRunning(false); setTimeout(connectServer, 1500); } };
   ws.onmessage = (m) => {
+    if (!real()) return;
     if (typeof m.data === "string") return handle(JSON.parse(m.data));
     const kind = new Uint8Array(m.data, 0, 1)[0];
-    if (kind === 1) { // live body poses: [t, nbody * (x y z qw qx qy qz)]
-      const f = new Float32Array(m.data, 4);
-      if (V.ready) V.applyPoses(f.subarray(1));
-      if (!real()) $("#pill-sim").textContent = `t = ${f[0].toFixed(1)} s`;
-      if (S.running) $("#m-sim").textContent = f[0].toFixed(1) + " s";
-    } else { // agent camera frame
-      const url = URL.createObjectURL(new Blob([m.data.slice(4)], { type: "image/jpeg" })), old = S.frameUrl;
-      $("#frame").src = url; S.frameUrl = url; RB.frame(url); if (old) setTimeout(() => URL.revokeObjectURL(old), 2000);
-    }
+    if (kind === 1) { const f = new Float32Array(m.data, 4); onPose(f[0], f.subarray(1)); }
+    else onFrame(new Blob([m.data.slice(4)], { type: "image/jpeg" }), true);
   };
 }
 
@@ -480,12 +522,21 @@ window.addEventListener("keydown", (e) => { if (e.key === "Escape" && real() && 
 (async function init() {
   S.aws = loadAws();
   buildAgents(); resetRun();
-  S.cfg = await (await fetch(API + "/api/config")).json();
+  S.cfg = localConfig();                           // scenes + arms are known to the engine itself
+  // a Dooms server, if one answers on this origin, is only consulted for real-robot support
+  try {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 2500);
+    const r = await fetch(API + "/api/config", { signal: ctl.signal }); clearTimeout(timer);
+    const d = r.ok && (r.headers.get("content-type") || "").includes("json") ? await r.json() : null;
+    if (d && d.real_robot) { S.server = d; S.cfg.real_robot = d.real_robot; S.cfg.real_robots = d.real_robots || []; }
+  } catch { /* static hosting: no server, no real robot */ }
   S.cfg.scenes.forEach((s) => (S.scenes[s.name] = s));
   try { const r = localStorage.getItem("dooms.robot"); if (r && (S.cfg.robots || []).some((x) => x.id === r)) S.robot = r; } catch { /* private mode */ }
   if (!S.scenes[S.scene] || !S.scenes[S.scene].robots.includes(S.robot)) S.scene = "sandbox";
   renderRobots(); renderModeRow(); renderScenes(); fillExamples(true); renderAwsChip(); renderSkills([]);
   try { if (localStorage.getItem("dooms.mode") === "real" && S.robot === "so101") { S.mode = "real"; segMode.set("real"); } } catch { /* private mode */ }
   renderRealPanels(); $("#btn-reset").hidden = real(); $("#seed").closest(".prow").hidden = real();
-  connect(); loadScene(); loadSkills();
+  connectEngine(); loadScene(); loadSkills();
+  if (real()) connectServer();
+  S.engineReady.then(autorun, () => {});
 })();

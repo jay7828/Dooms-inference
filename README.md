@@ -39,6 +39,20 @@ Model: Claude Sonnet 4.5 through the cross-region inference profile
 Each episode writes `scene.png`, `plan_*.json` (subtasks, recipes, parameters), `*_grounding.png` (points the VLM
 picked), `transcript.json` (every agent answer), `result.json`, `video.mp4` under its run directory.
 
+## Browser engine (no server needed)
+The web UI runs the whole thing **in the browser**: MuJoCo compiled to WebAssembly, the controllers, the four agents and
+the vision grounder live in a web worker (`web/engine/`, TypeScript, a TypeScript port of the Python stack). Claude is called straight from the page on Amazon Bedrock with the visitor's own AWS credentials
+(SigV4 signed with WebCrypto), and the skill library is kept in IndexedDB. Hosting it is just static files.
+
+```bash
+npm install && npm run build      # bundles web/ -> src/dooms/server/static/engine/ (committed, rebuild after editing web/)
+npm run typecheck
+npm run prompts                   # regenerate web/engine/prompts.ts after editing src/dooms/llm/prompts/*.md
+.venv/bin/python scripts/serve.py   # serves the UI; the simulation itself runs in the page
+```
+The Python server is only needed for a **real robot** (a web page cannot reach a USB arm); the UI talks to it over a
+WebSocket in that mode alone. Robot assets for the browser are slimmed copies under `static/dooms/`.
+
 ## Web UI (type a command, watch the sim)
 The page is a small studio: **command panel** (task, scene, planner, advanced options) · **live 3D simulation** with the
 agents' camera as an inset and a step-by-step progress bar · **tabs** for the agent pipeline, the skill library and an

@@ -1,7 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "python3 scripts/vercel_build.py",
+  "installCommand": "npm install --no-audit --no-fund",
+  "buildCommand": "npm run build && python3 scripts/vercel_build.py",
   "outputDirectory": "public",
-  "installCommand": "true"
+  "headers": [
+    {
+      "source": "/static/(dooms|vendor)/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, immutable" }]
+    },
+    {
+      "source": "/static/vendor/mujoco/(.*)\\.wasm",
+      "headers": [{ "key": "Content-Type", "value": "application/wasm" }]
+    }
+  ]
 }
