@@ -18,22 +18,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="/static/landing/studio.jpg">
 <style>
-  /* Tokens. One accent (signal orange) in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
+  /* Tokens. One accent (mint) in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
   :root, [data-theme="dark"] {
-    --bg: #0a0908; --bg-2: #100e0d; --surface: #151312; --line: #24211f; --line-2: #35302d;
-    --text: #f4f1ee; --text-2: #a8a19b; --muted: #756e68;
-    --accent: #ff5a2e; --accent-ink: #1c0700; --accent-text: #ff6a40; --accent-soft: rgba(255,90,46,.11);
-    --node-a: #1f100a; --node-a-hot: #3a190c; --edge: #6b645e; --pulse: #ffd2c2;
-    --code: #0c0b0a; --dot: rgba(255,255,255,.07); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
-    --nav: rgba(16,14,13,.72);
+    --bg: #070a0b; --bg-2: #0b1012; --surface: #101619; --line: #1b2327; --line-2: #2a363b;
+    --text: #eef4f4; --text-2: #97a6aa; --muted: #64747a;
+    --accent: #1fe0b0; --accent-ink: #00140f; --accent-text: #2ee6b8; --accent-soft: rgba(31,224,176,.1);
+    --node-a: #071a15; --node-a-hot: #0d3329; --edge: #5f6f74; --pulse: #c8fff0;
+    --code: #090d0e; --dot: rgba(255,255,255,.07); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
+    --nav: rgba(11,16,18,.72);
   }
   [data-theme="light"] {
-    --bg: #f4f2ee; --bg-2: #ebe8e2; --surface: #fcfbf9; --line: #dedad3; --line-2: #c9c3ba;
-    --text: #100d0b; --text-2: #554e48; --muted: #80786f;
-    --accent: #ff5a2e; --accent-ink: #1c0700; --accent-text: #c4380f; --accent-soft: rgba(255,90,46,.1);
-    --node-a: #ffe6dc; --node-a-hot: #ffcab6; --edge: #948b82; --pulse: #c4380f;
-    --code: #14110f; --dot: rgba(0,0,0,.09); --shadow: 0 50px 100px -45px rgba(40,20,10,.4);
-    --nav: rgba(252,251,249,.76);
+    --bg: #f0f4f3; --bg-2: #e6ecea; --surface: #fafcfb; --line: #d6dedb; --line-2: #bfcac6;
+    --text: #091110; --text-2: #4a5957; --muted: #74827f;
+    --accent: #1fe0b0; --accent-ink: #00140f; --accent-text: #007a5e; --accent-soft: rgba(0,150,115,.12);
+    --node-a: #d6f7ec; --node-a-hot: #aeeedb; --edge: #86938f; --pulse: #007a5e;
+    --code: #0d1312; --dot: rgba(0,0,0,.09); --shadow: 0 50px 100px -45px rgba(10,40,30,.4);
+    --nav: rgba(250,252,251,.76);
   }
   :root {
     --sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -74,7 +74,7 @@
   .btn:hover { border-color: var(--muted); background: var(--accent-soft); }
   .btn:active { transform: scale(.97); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  .btn.primary:hover { background: #ff7650; border-color: #ff7650; }
+  .btn.primary:hover { background: #55ecc6; border-color: #55ecc6; }
   .btn.sm { height: 38px; padding: 0 16px; font-size: 14.5px; }
   /* icons are Phosphor (MIT), inlined */
   .ic { width: 1em; height: 1em; flex: none; }
@@ -120,7 +120,7 @@
   .demo-bar .sp { flex: 1; }
   .chip { height: 36px; padding: 0 15px; border-radius: 999px; border: 1px solid #2b3038; background: transparent; color: #9aa2ad; font: 14px var(--mono); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
   .chip:hover { color: #f0f2f4; border-color: #68707b; }
-  .chip[aria-pressed="true"] { color: #1c0700; border-color: var(--accent); background: var(--accent); }
+  .chip[aria-pressed="true"] { color: #00140f; border-color: var(--accent); background: var(--accent); }
   .demo-bar .btn { color: #f0f2f4; border-color: #2b3038; }
   .stage { position: relative; height: min(82vh, 780px); min-height: 500px; }
   .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
@@ -128,7 +128,7 @@
   .poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .3; transition: opacity .5s, transform 1.4s var(--ease); }
   .poster:hover img { opacity: .42; transform: scale(1.03); }
   .poster .go { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; width: min(90%, 420px); }
-  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); color: #1c0700; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
+  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); color: #00140f; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
   .poster:hover .play { transform: scale(1.08); }
   .poster b { display: block; font: 600 24px var(--sans); letter-spacing: -.02em; }
   .poster small { display: block; font: 14.5px var(--sans); margin-top: 8px; opacity: .78; }
@@ -176,7 +176,7 @@
   .subs li { counter-increment: s; font-size: 15.5px; display: flex; gap: 12px; }
   .subs li::before { content: counter(s, decimal-leading-zero); font: 13px var(--mono); color: var(--muted); padding-top: 3px; }
   pre.code { margin: 22px 0 0; padding: 18px 20px; border-radius: 14px; background: var(--code); border: 1px solid #1d2127; font: 13.5px/1.8 var(--mono); color: #d3d7de; overflow-x: auto; }
-  pre.code .k { color: #ff8a66; } pre.code .c { color: #7b838e; }
+  pre.code .k { color: #5eead0; } pre.code .c { color: #7b838e; }
   .params { margin-top: 22px; display: grid; gap: 10px; }
   .params div { display: grid; grid-template-columns: 6.5em 5.5em 1fr; gap: 14px; align-items: baseline; font-size: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
   .params div:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -220,7 +220,7 @@
   .c-arms img { width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: 50% 40%; transition: transform 1.2s var(--ease); }
   .c-arms > div { padding: 24px 28px 28px; }
   .c-lib { grid-column: span 2; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-  .c-lib p { color: #4a1505; }
+  .c-lib p { color: #06382c; }
   .c-lib:hover { border-color: var(--accent); }
   .c-adv { grid-column: span 2; }
   .c-web { grid-column: span 6; display: grid; grid-template-columns: 5fr 7fr; padding: 0; }
@@ -324,7 +324,7 @@
     .trials.in .sq { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .45s var(--ease); transition-delay: calc(var(--k) * 14ms + var(--r) * 110ms); }
     .trials.in .sq:hover { transition-delay: 0s; transform: scale(1.35); }
     .poster .play { animation: beat 2.4s var(--ease) infinite; }
-    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,90,46,.45); } 60% { box-shadow: 0 0 0 26px rgba(255,90,46,0); } }
+    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(31,224,176,.45); } 60% { box-shadow: 0 0 0 26px rgba(31,224,176,0); } }
   }
   /* theme change: a circular wipe from the switch, where the browser supports view transitions */
   ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
@@ -580,7 +580,7 @@
       <p>A failed subtask first triggers a second look at the scene. Only if that fails does the Scout plan again from where things now lie.</p>
     </div>
     <div class="cell c-web rv">
-      <div><h3>Inference moved into the browser</h3><p>The Python stack was ported to TypeScript and a web worker. Claude is called from the page with your own AWS credentials, and skills are kept in IndexedDB. Hosting is static files.</p></div>
+      <div><h3>Inference moved into the browser</h3><p>The Python stack was ported to TypeScript and a web worker. Claude is called from the page with your own Claude API key or AWS credentials, and skills are kept in IndexedDB. Hosting is static files.</p></div>
       <img src="/static/landing/franka.jpg" width="1400" height="1142" loading="lazy" alt="The in-browser 3D view of the Franka arm holding a bottle above the table">
     </div>
   </div>
