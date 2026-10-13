@@ -18,22 +18,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="/static/landing/studio.jpg">
 <style>
-  /* Tokens. One accent (electric blue) in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
+  /* Tokens. Black and white only: the accent is the ink colour of each theme in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
   :root, [data-theme="dark"] {
-    --bg: #07080c; --bg-2: #0b0d13; --surface: #10131a; --line: #1c212b; --line-2: #2b3240;
-    --text: #f0f3f8; --text-2: #9aa3b4; --muted: #687182;
-    --accent: #2b5cf5; --accent-ink: #f5f8ff; --accent-text: #7aa2ff; --accent-soft: rgba(70,120,255,.13);
-    --node-a: #0a1230; --node-a-hot: #152358; --edge: #606a7c; --pulse: #d6e2ff;
-    --code: #090b10; --dot: rgba(255,255,255,.07); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
-    --nav: rgba(11,13,19,.72);
+    --bg: #0a0a0a; --bg-2: #0f0f0f; --surface: #141414; --line: #222222; --line-2: #333333;
+    --text: #f2f2f2; --text-2: #a3a3a3; --muted: #6e6e6e;
+    --accent: #f2f2f2; --accent-ink: #0a0a0a; --accent-text: #f2f2f2; --accent-soft: rgba(255,255,255,.07);
+    --node-a: #1e1e1e; --node-a-hot: #3c3c3c; --edge: #6a6a6a; --pulse: #fafafa;
+    --code: #0d0d0d; --dot: rgba(255,255,255,.08); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
+    --nav: rgba(15,15,15,.72);
   }
   [data-theme="light"] {
-    --bg: #f1f3f7; --bg-2: #e7eaf0; --surface: #fbfcfe; --line: #d8dce5; --line-2: #c2c8d4;
-    --text: #0a0d14; --text-2: #4b5364; --muted: #757d8c;
-    --accent: #2b5cf5; --accent-ink: #f5f8ff; --accent-text: #1f49d6; --accent-soft: rgba(43,92,245,.1);
-    --node-a: #e1e9ff; --node-a-hot: #c4d4ff; --edge: #8990a0; --pulse: #1f49d6;
-    --code: #0d1017; --dot: rgba(0,0,0,.09); --shadow: 0 50px 100px -45px rgba(15,25,60,.4);
-    --nav: rgba(251,252,254,.76);
+    --bg: #f4f4f4; --bg-2: #eaeaea; --surface: #fcfcfc; --line: #dcdcdc; --line-2: #c6c6c6;
+    --text: #0a0a0a; --text-2: #4f4f4f; --muted: #7a7a7a;
+    --accent: #0a0a0a; --accent-ink: #f4f4f4; --accent-text: #0a0a0a; --accent-soft: rgba(0,0,0,.06);
+    --node-a: #e4e4e4; --node-a-hot: #c4c4c4; --edge: #8a8a8a; --pulse: #0a0a0a;
+    --code: #111111; --dot: rgba(0,0,0,.1); --shadow: 0 50px 100px -45px rgba(0,0,0,.35);
+    --nav: rgba(252,252,252,.76);
   }
   :root {
     --sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -74,14 +74,14 @@
   .btn:hover { border-color: var(--muted); background: var(--accent-soft); }
   .btn:active { transform: scale(.97); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  .btn.primary:hover { background: #4a78ff; border-color: #4a78ff; }
+  .btn.primary:hover { background: var(--accent); border-color: var(--accent); opacity: .84; }
   .btn.sm { height: 38px; padding: 0 16px; font-size: 14.5px; }
   /* icons are Phosphor (MIT), inlined */
   .ic { width: 1em; height: 1em; flex: none; }
   .btn .ic { font-size: 18px; }
   .stars { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; padding-left: 10px; border-left: 1px solid currentColor; font: 500 13.5px var(--mono); }
   .stars:has(b:empty) { border-left: 0; padding-left: 0; margin-left: 0; }
-  .stars .ic { font-size: 15px; color: #f5b83d; }
+  .stars .ic { font-size: 15px; }
   .btn .star { transition: transform .5s var(--ease); }
   .btn:hover .star { transform: rotate(72deg) scale(1.2); }
   .btn.primary .star { color: inherit; }
@@ -126,7 +126,7 @@
   .demo-bar .sp { flex: 1; }
   .chip { height: 36px; padding: 0 15px; border-radius: 999px; border: 1px solid #2b3038; background: transparent; color: #9aa2ad; font: 14px var(--mono); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
   .chip:hover { color: #f0f2f4; border-color: #68707b; }
-  .chip[aria-pressed="true"] { color: #f5f8ff; border-color: var(--accent); background: var(--accent); }
+  .chip[aria-pressed="true"] { color: #0a0a0a; border-color: #f2f2f2; background: #f2f2f2; }
   .demo-bar .btn { color: #f0f2f4; border-color: #2b3038; }
   .stage { position: relative; height: min(82vh, 780px); min-height: 500px; }
   .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
@@ -134,7 +134,7 @@
   .poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .3; transition: opacity .5s, transform 1.4s var(--ease); }
   .poster:hover img { opacity: .42; transform: scale(1.03); }
   .poster .go { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; width: min(90%, 420px); }
-  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); color: #f5f8ff; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
+  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: #f2f2f2; color: #0a0a0a; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
   .poster:hover .play { transform: scale(1.08); }
   .poster b { display: block; font: 600 24px var(--sans); letter-spacing: -.02em; }
   .poster small { display: block; font: 14.5px var(--sans); margin-top: 8px; opacity: .78; }
@@ -182,7 +182,7 @@
   .subs li { counter-increment: s; font-size: 15.5px; display: flex; gap: 12px; }
   .subs li::before { content: counter(s, decimal-leading-zero); font: 13px var(--mono); color: var(--muted); padding-top: 3px; }
   pre.code { margin: 22px 0 0; padding: 18px 20px; border-radius: 14px; background: var(--code); border: 1px solid #1d2127; font: 13.5px/1.8 var(--mono); color: #d3d7de; overflow-x: auto; }
-  pre.code .k { color: #8fb2ff; } pre.code .c { color: #7b838e; }
+  pre.code .k { color: #ffffff; font-weight: 500; } pre.code .c { color: #7b838e; }
   .params { margin-top: 22px; display: grid; gap: 10px; }
   .params div { display: grid; grid-template-columns: 6.5em 5.5em 1fr; gap: 14px; align-items: baseline; font-size: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
   .params div:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -226,7 +226,7 @@
   .c-arms img { width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: 50% 40%; transition: transform 1.2s var(--ease); }
   .c-arms > div { padding: 24px 28px 28px; }
   .c-lib { grid-column: span 2; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-  .c-lib p { color: #dbe6ff; }
+  .c-lib p { color: var(--accent-ink); opacity: .74; }
   .c-lib:hover { border-color: var(--accent); }
   .c-adv { grid-column: span 2; }
   .c-web { grid-column: span 6; display: grid; grid-template-columns: 5fr 7fr; padding: 0; }
@@ -330,7 +330,7 @@
     .trials.in .sq { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .45s var(--ease); transition-delay: calc(var(--k) * 14ms + var(--r) * 110ms); }
     .trials.in .sq:hover { transition-delay: 0s; transform: scale(1.35); }
     .poster .play { animation: beat 2.4s var(--ease) infinite; }
-    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(43,92,245,.45); } 60% { box-shadow: 0 0 0 26px rgba(43,92,245,0); } }
+    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,.45); } 60% { box-shadow: 0 0 0 26px rgba(255,255,255,0); } }
   }
   /* theme change: a circular wipe from the switch, where the browser supports view transitions */
   ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
