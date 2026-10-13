@@ -10,6 +10,7 @@
     "build": "node web/build.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "three": "0.186.1"
   },
   "devDependencies": {

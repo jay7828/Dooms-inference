@@ -3,7 +3,7 @@
 // needed for a real robot (USB arm + camera): it is reached over a WebSocket and only in that mode.
 import { createViewer } from "/static/viewer.js";
 import { createRobot } from "/static/robot.js";
-import { LocalSession, localConfig, localEngineSupported, localSkills, clearLocalSkills, validateInBrowser } from "/static/engine/client.js";
+import { LocalSession, localConfig, localEngineSupported, localSkills, clearLocalSkills, validateInBrowser, validateAnthropicKey, ANTHROPIC_MODELS } from "/static/engine/client.js";
 
 const API = (window.DOOMS_API || "").replace(/\/$/, ""); // optional Dooms server (real robots only): "" = same origin
 const BASE = "/static";                                  // where engine/, dooms/ and vendor/mujoco/ are served
@@ -112,33 +112,41 @@ const serverKeys = () => real() && !!S.server?.bedrock_ready && !S.server?.requi
 function renderAwsChip() {
   const chip = $("#btn-aws"), server = serverKeys();
   chip.classList.toggle("ok", !!S.aws || server);
-  $("#aws-label").innerHTML = S.aws ? `AWS <small>${esc(S.aws.identity || "connected")}</small>` : server ? "AWS <small>server key</small>" : "Connect AWS";
+  $("#aws-label").innerHTML = S.aws ? `${S.aws.mode === "anthropic" ? "Claude API" : "Bedrock"} <small>${esc(S.aws.identity || "connected")}</small>` : server ? "Bedrock <small>server key</small>" : "Connect Claude";
   renderPlannerNote();
 }
 function renderPlannerNote() {
   const el = $("#planner-note");
   if (S.planner !== "bedrock") { el.innerHTML = ""; return; }
   if (S.aws) {
-    el.innerHTML = `<div class="callout ok">${I.check}<div>Your AWS account · ${esc(S.aws.region)}<br><span class="hint">${esc(S.aws.model.replace(/^(us|global|eu|apac)\.anthropic\./, ""))}</span></div></div>`;
+    el.innerHTML = `<div class="callout ok">${I.check}<div>${S.aws.mode === "anthropic" ? "Your Claude API key" : "Your AWS account · " + esc(S.aws.region)}<br><span class="hint">${esc(modelLabel(S.aws.model))}</span></div></div>`;
   } else if (serverKeys()) {
     el.innerHTML = `<div class="callout">${I.info}<div>Using the server's AWS credentials. <a href="#" id="use-own" style="color:var(--accent-h)">Use mine</a></div></div>`;
     $("#use-own").onclick = (e) => { e.preventDefault(); openAws(); };
   } else {
-    el.innerHTML = `<div class="callout warn">${I.alert}<div>Claude needs an AWS account with Bedrock access.<br><button class="btn" id="callout-connect">Connect AWS</button></div></div>`;
+    el.innerHTML = `<div class="callout warn">${I.alert}<div>Claude needs your own Claude API key or AWS Bedrock credentials.<br><button class="btn" id="callout-connect">Connect Claude</button></div></div>`;
     $("#callout-connect").onclick = openAws;
   }
 }
 const modal = $("#aws-modal");
-const modeSeg = seg($("#aws-mode"), (m) => { $("#mode-keys").hidden = m !== "keys"; $("#mode-bearer").hidden = m !== "bearer"; });
+const BEDROCK_DEFAULT = "us.anthropic.claude-sonnet-4-5-20250929-v1:0";
+const modelLabel = (m) => ANTHROPIC_MODELS.find((x) => x.id === m)?.label || m.replace(/^(us|global|eu|apac)\.anthropic\./, "").replace(/-v\d+:\d+$/, "");
+function showMode(m, keepModels) {
+  $("#mode-anthropic").hidden = m !== "anthropic"; $("#mode-keys").hidden = m !== "keys"; $("#mode-bearer").hidden = m !== "bearer";
+  $("#aws-region-wrap").hidden = m === "anthropic";
+  if (!keepModels) m === "anthropic" ? fillModels(ANTHROPIC_MODELS.map((x) => x.id), ANTHROPIC_MODELS[0].id) : fillModels([BEDROCK_DEFAULT], BEDROCK_DEFAULT);
+}
+const modeSeg = seg($("#aws-mode"), (m) => showMode(m));
 function openAws() {
   const a = S.aws;
   if (a) {
-    modeSeg.set(a.mode); $("#mode-keys").hidden = a.mode !== "keys"; $("#mode-bearer").hidden = a.mode !== "bearer";
+    modeSeg.set(a.mode); showMode(a.mode, true);
     $("#aws-akid").value = a.creds.access_key_id || ""; $("#aws-secret").value = a.creds.secret_access_key || "";
-    $("#aws-token").value = a.creds.session_token || ""; $("#aws-bearer").value = a.creds.bearer_token || "";
-    $("#aws-region").value = a.region; $("#aws-remember").checked = !!a.remember;
+    $("#aws-token").value = a.creds.session_token || ""; $("#aws-bearer").value = a.creds.bearer_token || ""; $("#aws-apikey").value = a.creds.api_key || "";
+    if (a.mode !== "anthropic") $("#aws-region").value = a.region;
+    $("#aws-remember").checked = !!a.remember;
     fillModels(a.models || [a.model], a.model);
-  }
+  } else showMode(modeSeg.get() || "anthropic");
   $("#aws-disconnect").hidden = !a;
   setAwsStatus(a ? "ok" : "", a ? `Connected as ${a.identity}.` : "");
   modal.showModal();
@@ -146,7 +154,7 @@ function openAws() {
 function fillModels(models, selected) {
   const sel = $("#aws-model");
   const list = [...new Set([selected, ...models].filter(Boolean))];
-  sel.innerHTML = list.map((m) => `<option value="${esc(m)}">${esc(m.replace(/^(us|global|eu|apac)\.anthropic\./, "").replace(/-v\d+:\d+$/, ""))}</option>`).join("");
+  sel.innerHTML = list.map((m) => `<option value="${esc(m)}">${esc(modelLabel(m))}</option>`).join("");
   sel.value = selected;
 }
 function setAwsStatus(kind, msg) {
@@ -156,6 +164,7 @@ function setAwsStatus(kind, msg) {
 }
 function readForm() {
   const mode = modeSeg.get();
+  if (mode === "anthropic") return { mode, creds: { api_key: $("#aws-apikey").value.trim() } };
   const creds = { region: $("#aws-region").value };
   if (mode === "keys") { creds.access_key_id = $("#aws-akid").value.trim(); creds.secret_access_key = $("#aws-secret").value.trim(); creds.session_token = $("#aws-token").value.trim(); }
   else creds.bearer_token = $("#aws-bearer").value.trim();
@@ -166,10 +175,11 @@ $("#aws-form").addEventListener("submit", async (e) => {
   const { mode, creds } = readForm();
   if (mode === "keys" && !(creds.access_key_id && creds.secret_access_key)) return setAwsStatus("bad", "Enter the access key ID and the secret access key.");
   if (mode === "bearer" && !creds.bearer_token) return setAwsStatus("bad", "Enter the Bedrock API key.");
+  if (mode === "anthropic" && !creds.api_key) return setAwsStatus("bad", "Enter your Claude API key.");
   const btn = $("#aws-validate"); btn.disabled = true;
-  setAwsStatus("busy", "Checking credentials and Claude access…");
+  setAwsStatus("busy", mode === "anthropic" ? "Checking the key…" : "Checking credentials and Claude access…");
   try {
-    const d = await validateInBrowser(creds, $("#aws-model").value || null);
+    const d = mode === "anthropic" ? await validateAnthropicKey(creds.api_key, $("#aws-model").value || null) : await validateInBrowser(creds, $("#aws-model").value || null);
     if (!d.ok) return setAwsStatus("bad", d.message || "Could not connect.");
     const model = d.tested_model;
     S.aws = { mode, creds, region: d.region, model, models: d.models, identity: d.identity || "connected" };
@@ -178,13 +188,13 @@ $("#aws-form").addEventListener("submit", async (e) => {
     setAwsStatus("ok", `Connected as ${S.aws.identity}. ${d.models.length} Claude model${d.models.length === 1 ? "" : "s"} available.`);
     $("#aws-disconnect").hidden = false;
     renderAwsChip();
-    toast("ok", "AWS connected", "Select the Claude planner to use it.");
+    toast("ok", mode === "anthropic" ? "Claude API connected" : "AWS Bedrock connected", "Select the Claude planner to use it.");
     setTimeout(() => modal.close(), 900);
   } catch (err) { setAwsStatus("bad", String(err.message || err)); }
   finally { btn.disabled = false; }
 });
 $("#aws-model").addEventListener("change", () => { if (S.aws) { S.aws.model = $("#aws-model").value; saveAws($("#aws-remember").checked); renderPlannerNote(); } });
-$("#aws-disconnect").onclick = () => { S.aws = null; saveAws(false); ["#aws-akid", "#aws-secret", "#aws-token", "#aws-bearer"].forEach((s) => ($(s).value = "")); renderAwsChip(); setAwsStatus("", ""); $("#aws-disconnect").hidden = true; toast("info", "Disconnected", "Your credentials were removed from this browser session."); };
+$("#aws-disconnect").onclick = () => { S.aws = null; saveAws(false); ["#aws-akid", "#aws-secret", "#aws-token", "#aws-bearer", "#aws-apikey"].forEach((s) => ($(s).value = "")); renderAwsChip(); setAwsStatus("", ""); $("#aws-disconnect").hidden = true; toast("info", "Disconnected", "Your credentials were removed from this browser session."); };
 $("#aws-cancel").onclick = $("#aws-close").onclick = () => modal.close();
 modal.addEventListener("click", (e) => { if (e.target === modal) modal.close(); });
 $$("[data-toggle]").forEach((b) => (b.onclick = () => { const i = $("#" + b.dataset.toggle); i.type = i.type === "password" ? "text" : "password"; b.textContent = i.type === "password" ? "Show" : "Hide"; }));
@@ -418,7 +428,8 @@ function setRunning(v) {
 function start() {
   if (real() ? S.ws?.readyState !== 1 : !S.engineOn) return toast("err", real() ? "Not connected" : "Simulator not ready", real() ? "The server connection is down. Retrying…" : "The in-browser simulator is still starting.");
   if (!V.ready) return toast("info", "Still loading", "The 3D scene is not ready yet.");
-  if (S.planner === "bedrock" && !S.aws && !serverKeys()) { openAws(); return toast("info", "Connect AWS first", "Add your credentials to use Claude."); }
+  if (S.planner === "bedrock" && !S.aws && !serverKeys()) { openAws(); return toast("info", "Connect Claude first", "Add a Claude API key or AWS Bedrock credentials."); }
+  if (real() && S.planner === "bedrock" && S.aws?.mode === "anthropic" && !serverKeys()) { openAws(); return toast("info", "Real robot needs Bedrock", "The robot server plans with Claude on Amazon Bedrock. Connect AWS credentials for real-robot runs."); }
   if (real() && !realAvailable()) return toast("info", "Use the desktop app", S.cfg.real_robot.reason);
   if (real()) {
     if (!RB.ready()) { RB.open(); return toast("info", "Finish the robot setup", "Connect, calibrate the arm and the camera first."); }

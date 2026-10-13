@@ -43,11 +43,13 @@ export interface LlmContext {
 /** Create the model client for a planner kind (null: unknown kind). The Demo planner is built in; 'bedrock' is Claude. */
 export type LlmFactory = (ctx: LlmContext) => LLM | null | Promise<LLM | null>
 
-/** Claude on Amazon Bedrock, called from this very worker with the credentials that came with the run command. */
+/** Claude, called from this very worker with the credentials that came with the run command: the Claude API or Amazon Bedrock. */
 export async function bedrockFactory(ctx: LlmContext): Promise<LLM | null> {
   if (ctx.kind !== 'bedrock') return null
   const [{ bedrockFromMessage }, { registerPrompts }] = await Promise.all([import('./bedrock/client'), import('./prompts')])
   registerPrompts()
+  // a Claude API key goes to api.anthropic.com; AWS keys or a Bedrock API key go to Amazon Bedrock
+  if ((ctx.msg.credentials as { api_key?: string } | undefined)?.api_key) return (await import('./anthropic/client')).anthropicFromMessage(ctx.msg)
   return bedrockFromMessage(ctx.msg)
 }
 

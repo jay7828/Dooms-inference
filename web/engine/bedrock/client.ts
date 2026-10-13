@@ -265,6 +265,6 @@ export class BedrockLLM implements LLM {
 export function bedrockFromMessage(msg: Record<string, unknown>, opts: BedrockOptions = {}): BedrockLLM {
   const creds = msg.credentials as AwsCredentials | undefined
   if (!creds || (!creds.bearer_token && !(creds.access_key_id && creds.secret_access_key)))
-    throw new BedrockError('Claude needs your AWS credentials. Choose "Connect AWS" first.', 'credentials')
+    throw new BedrockError('Claude needs your credentials. Choose "Connect Claude" and add a Claude API key or AWS Bedrock credentials.', 'credentials')
   return new BedrockLLM(creds, { ...opts, model: typeof msg.model === 'string' && msg.model ? msg.model : opts.model })
 }

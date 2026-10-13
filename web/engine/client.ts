@@ -9,6 +9,7 @@ import { SkillLibrary } from './skills'
 import { IdbSkillStorage } from './skillsIdb'
 export { localConfig } from './localConfig'
 export { validateInBrowser } from './bedrock/validate'
+export { validateAnthropicKey, ANTHROPIC_MODELS } from './anthropic/client'
 
 export interface LocalSessionOptions {
   /** where mujoco/mujoco.js, dooms/ (robot assets) and engine.worker.js live (a URL prefix such as "/static") */

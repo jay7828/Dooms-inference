@@ -110,6 +110,10 @@
   .strip b { display: block; font: 600 clamp(30px, 3.4vw, 46px)/1 var(--sans); letter-spacing: -.04em; }
   .strip span { display: block; color: var(--text-2); font-size: 14.5px; margin-top: 10px; }
 
+  .keys { margin-top: 18px; max-width: 64ch; color: var(--text-2); font-size: 15.5px; padding: 14px 18px; border: 1px solid var(--line-2); border-radius: var(--r-m); background: var(--surface); }
+  .keys b { color: var(--text); font-weight: 600; }
+  .keys span { font-family: var(--mono); font-size: 14px; color: var(--accent-text); }
+
   /* live engine */
   .demo { border: 1px solid var(--line-2); border-radius: var(--r); overflow: hidden; background: #0b0d10; box-shadow: var(--shadow); }
   .demo-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid #1d2127; background: #0f1114; }
@@ -390,6 +394,7 @@
   <div class="head rv">
     <h2>Try the engine. Nothing to install.</h2>
     <p class="lede">MuJoCo compiled to WebAssembly, driving a Franka Panda in a web worker on your machine. The built-in demo planner needs no account.</p>
+    <p class="keys"><b>Planning with Claude?</b> Open the studio and connect either a <span>Claude API key</span> or <span>Amazon Bedrock</span> credentials. Requests go from your browser straight to the provider you choose, and are billed to you.</p>
   </div>
   <div class="demo rv">
     <div class="demo-bar">
@@ -544,7 +549,7 @@
   <div class="head rv"><h2>Use it to train models and try out arms</h2></div>
   <div class="uses">
     <div class="rv"><span class="tag">Data</span><h3>Generate labelled episodes</h3><p>Every run is seeded and saves the camera frames, 3D keypoints, controller script and a ground-truth success label. That is the raw material for training a manipulation policy.</p></div>
-    <div class="rv"><span class="tag">Models</span><h3>Compare planners on the same seeds</h3><p>Swap the Bedrock model with one flag and read off success rate, cost, latency and grounding error. Ablations turn single stages off.</p></div>
+    <div class="rv"><span class="tag">Models</span><h3>Compare planners on the same seeds</h3><p>Swap the Claude model with one flag and read off success rate, cost, latency and grounding error. Ablations turn single stages off.</p></div>
     <div class="rv"><span class="tag">Arms</span><h3>Bring up a new arm</h3><p>An arm is a profile: joints, gripper, workspace. A Franka Panda and an SO-ARM101 ship today, and the SO-101 can be driven for real over USB.</p></div>
   </div>
 </div></section>

@@ -141,6 +141,8 @@ export interface AwsCredentials {
   secret_access_key?: string
   session_token?: string
   bearer_token?: string
+  /** a Claude API key (api.anthropic.com) instead of AWS credentials */
+  api_key?: string
 }
 export interface AwsConnection {
   mode: 'keys' | 'bearer'

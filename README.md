@@ -41,8 +41,8 @@ picked), `transcript.json` (every agent answer), `result.json`, `video.mp4` unde
 
 ## Browser engine (no server needed)
 The web UI runs the whole thing **in the browser**: MuJoCo compiled to WebAssembly, the controllers, the four agents and
-the vision grounder live in a web worker (`web/engine/`, TypeScript, a TypeScript port of the Python stack). Claude is called straight from the page on Amazon Bedrock with the visitor's own AWS credentials
-(SigV4 signed with WebCrypto), and the skill library is kept in IndexedDB. Hosting it is just static files.
+the vision grounder live in a web worker (`web/engine/`, TypeScript, a TypeScript port of the Python stack). Claude is called straight from the page with the visitor's own credentials: a Claude API key
+(`@anthropic-ai/sdk`, api.anthropic.com) or Amazon Bedrock (AWS keys, SigV4 signed with WebCrypto, or a Bedrock API key), and the skill library is kept in IndexedDB. Hosting it is just static files.
 
 ```bash
 npm install && npm run build      # bundles web/ -> src/dooms/server/static/engine/ (committed, rebuild after editing web/)
