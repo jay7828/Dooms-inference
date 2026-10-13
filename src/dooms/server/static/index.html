@@ -239,7 +239,7 @@
   .trow .sq { cursor: default; transition: transform .2s var(--ease); }
   .trow .sq:hover { transform: scale(1.35); }
   .trow .ct { text-align: right; font: 500 20px var(--mono); letter-spacing: -.02em; }
-  .trow .ct small { color: var(--muted); font-size: 14px; }
+  .trow .ct small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
   .tkey { display: flex; gap: 24px; margin-top: 18px; color: var(--text-2); font-size: 14.5px; }
   .tkey .sq { display: inline-block; width: 13px; vertical-align: -2px; margin-right: 8px; }
   .tip { position: fixed; z-index: 60; pointer-events: none; background: var(--text); color: var(--bg); font: 13px var(--mono); padding: 6px 10px; border-radius: 8px; opacity: 0; transition: opacity .15s; transform: translate(-50%, calc(-100% - 12px)); white-space: nowrap; }
@@ -254,6 +254,7 @@
   .tbl tr:last-child td { border-bottom: 0; }
   .tbl .num { text-align: right; font-family: var(--mono); padding-right: 0; padding-left: 16px; }
   .tbl td.win { font: 500 16.5px var(--mono); }
+  .tbl td.win small { color: var(--muted); font-size: 13px; margin-left: 8px; }
   .tbl td.win span { background: var(--accent); color: var(--accent-ink); padding: 4px 12px; border-radius: 999px; }
   .caveat { color: var(--muted); font-size: 14.5px; margin-top: 28px; max-width: 78ch; }
 
@@ -384,7 +385,7 @@
 </div><div class="hero-fade"></div></header>
 
 <section class="strip" aria-label="Key numbers"><div class="wrap">
-  <div class="it"><b>142 / 150</b><span>simulated trials solved with Claude planning</span></div>
+  <div class="it"><b>94.7%</b><span>accuracy with Claude planning: 142 of 150 simulated trials solved</span></div>
   <div class="it"><b>5 × 30</b><span>tasks and random seeds each, no demonstrations</span></div>
   <div class="it"><b>$0.13</b><span>of Claude calls per task, 8 calls on average</span></div>
   <div class="it"><b>0</b><span>servers needed to run the simulator</span></div>
@@ -587,23 +588,23 @@
 
 <section id="results"><div class="wrap">
   <div class="head rv">
-    <h2>150 trials with Claude, every one counted</h2>
+    <h2>94.7% accuracy over 150 trials with Claude</h2>
     <p class="lede">Claude Sonnet 4.5 on Amazon Bedrock plans, a Franka Panda acts. Five tasks, 30 random seeds each, scored by the simulator's own ground truth. Each square is one trial.</p>
   </div>
-  <div class="trials rv" id="trials" role="img" aria-label="Trials solved per task with Claude planning: bottle in box 30 of 30, red cube in box 29 of 30, stack red on blue 29 of 30, blue cube in box on a cluttered table 29 of 30, stack blue on red on a cluttered table 25 of 30."></div>
+  <div class="trials rv" id="trials" role="img" aria-label="Accuracy per task with Claude planning, 94.7% overall: bottle in box 30 of 30, red cube in box 29 of 30, stack red on blue 29 of 30, blue cube in box on a cluttered table 29 of 30, stack blue on red on a cluttered table 25 of 30."></div>
   <div class="tkey rv"><span><i class="sq"></i>Solved</span><span><i class="sq miss"></i>Not solved</span></div>
-  <p class="caveat rv">No demonstrations and no training: each trial is a fresh plan from one sentence and one camera frame. In every miss the arm finished its plan but the object did not end up where the task asked. Simulation only; nothing here was measured on physical hardware.</p>
+  <p class="caveat rv">No demonstrations and no training: each trial is a fresh plan from one sentence and one camera frame. Accuracy is the share of trials where the object ended up where the task asked: 142 of 150, with a 95% interval of 89.8% to 97.3%. In every miss the arm finished its plan but the object was not in place. Simulation only; nothing here was measured on physical hardware.</p>
 
   <h3 class="sub rv">What each task cost</h3>
   <div class="tblwrap rv">
     <table class="tbl">
-      <thead><tr><th>Task</th><th>Solved</th><th class="num">Model calls</th><th class="num">Cost</th><th class="num">Planning time</th><th class="num">Grounding error</th></tr></thead>
+      <thead><tr><th>Task</th><th>Accuracy</th><th class="num">Model calls</th><th class="num">Cost</th><th class="num">Planning time</th><th class="num">Grounding error</th></tr></thead>
       <tbody>
-        <tr><td>Put the bottle in the box</td><td class="win"><span>30 / 30</span></td><td class="num">8.3</td><td class="num">$0.131</td><td class="num">60.3 s</td><td class="num">12.4 mm</td></tr>
-        <tr><td>Put the red cube in the box</td><td class="win"><span>29 / 30</span></td><td class="num">8.0</td><td class="num">$0.133</td><td class="num">61.9 s</td><td class="num">18.5 mm</td></tr>
-        <tr><td>Stack red on blue</td><td class="win"><span>29 / 30</span></td><td class="num">8.0</td><td class="num">$0.131</td><td class="num">61.0 s</td><td class="num">7.0 mm</td></tr>
-        <tr><td>Blue cube in the box, cluttered table</td><td class="win"><span>29 / 30</span></td><td class="num">8.2</td><td class="num">$0.136</td><td class="num">63.7 s</td><td class="num">24.1 mm</td></tr>
-        <tr><td>Stack blue on red, cluttered table</td><td class="win"><span>25 / 30</span></td><td class="num">8.0</td><td class="num">$0.130</td><td class="num">59.9 s</td><td class="num">17.8 mm</td></tr>
+        <tr><td>Put the bottle in the box</td><td class="win"><span>100%</span> <small>30 / 30</small></td><td class="num">8.3</td><td class="num">$0.131</td><td class="num">60.3 s</td><td class="num">12.4 mm</td></tr>
+        <tr><td>Put the red cube in the box</td><td class="win"><span>97%</span> <small>29 / 30</small></td><td class="num">8.0</td><td class="num">$0.133</td><td class="num">61.9 s</td><td class="num">18.5 mm</td></tr>
+        <tr><td>Stack red on blue</td><td class="win"><span>97%</span> <small>29 / 30</small></td><td class="num">8.0</td><td class="num">$0.131</td><td class="num">61.0 s</td><td class="num">7.0 mm</td></tr>
+        <tr><td>Blue cube in the box, cluttered table</td><td class="win"><span>97%</span> <small>29 / 30</small></td><td class="num">8.2</td><td class="num">$0.136</td><td class="num">63.7 s</td><td class="num">24.1 mm</td></tr>
+        <tr><td>Stack blue on red, cluttered table</td><td class="win"><span>83%</span> <small>25 / 30</small></td><td class="num">8.0</td><td class="num">$0.130</td><td class="num">59.9 s</td><td class="num">17.8 mm</td></tr>
       </tbody>
     </table>
   </div>
@@ -700,7 +701,7 @@ uv pip install --python .venv/bin/python -e ".[dev]"
   ];
   $("#trials").innerHTML = TRIALS.map(([name, miss], r) => `<div class="trow"><div class="nm">${name}</div><div class="sqs">${
     Array.from({ length: N }, (_, k) => `<i class="sq${miss.includes(k) ? " miss" : ""}" style="--k:${k};--r:${r}" data-tip="seed ${k}: ${miss.includes(k) ? "not solved" : "solved"}"></i>`).join("")
-  }</div><div class="ct">${N - miss.length}<small> / ${N}</small></div></div>`).join("");
+  }</div><div class="ct">${Math.round((100 * (N - miss.length)) / N)}%<small>${N - miss.length} / ${N}</small></div></div>`).join("");
   const tip = document.createElement("div"); tip.className = "tip"; document.body.appendChild(tip);
   $("#trials").addEventListener("pointermove", (e) => { const t = e.target.closest("[data-tip]"); if (!t) return (tip.style.opacity = 0); const b = t.getBoundingClientRect(); tip.textContent = t.dataset.tip; tip.style.left = b.left + b.width / 2 + "px"; tip.style.top = b.top + "px"; tip.style.opacity = 1; });
   $("#trials").addEventListener("pointerleave", () => (tip.style.opacity = 0));
