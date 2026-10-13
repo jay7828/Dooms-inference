@@ -12,27 +12,28 @@
   (function () { var t = null; try { t = localStorage.getItem("dooms.theme"); } catch (e) {}
     document.documentElement.dataset.theme = t || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); })();
 </script>
+<link rel="icon" type="image/svg+xml" href="/static/landing/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="/static/landing/studio.jpg">
 <style>
-  /* Tokens. One accent (signal lime) in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
+  /* Tokens. One accent (signal orange) in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
   :root, [data-theme="dark"] {
-    --bg: #07080a; --bg-2: #0c0e11; --surface: #111418; --line: #1d2127; --line-2: #2b3038;
-    --text: #f0f2f4; --text-2: #9aa2ad; --muted: #68707b;
-    --accent: #c6f432; --accent-ink: #0d1300; --accent-text: #c6f432; --accent-soft: rgba(198,244,50,.1);
-    --node-a: #141a05; --node-a-hot: #26330a; --edge: #606873; --pulse: #f0ffb8;
-    --code: #0a0c0f; --dot: rgba(255,255,255,.07); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
-    --nav: rgba(12,14,17,.72);
+    --bg: #0a0908; --bg-2: #100e0d; --surface: #151312; --line: #24211f; --line-2: #35302d;
+    --text: #f4f1ee; --text-2: #a8a19b; --muted: #756e68;
+    --accent: #ff5a2e; --accent-ink: #1c0700; --accent-text: #ff6a40; --accent-soft: rgba(255,90,46,.11);
+    --node-a: #1f100a; --node-a-hot: #3a190c; --edge: #6b645e; --pulse: #ffd2c2;
+    --code: #0c0b0a; --dot: rgba(255,255,255,.07); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
+    --nav: rgba(16,14,13,.72);
   }
   [data-theme="light"] {
-    --bg: #f1f3f0; --bg-2: #e8ebe7; --surface: #fafbf9; --line: #d9ddd7; --line-2: #c3c9c1;
-    --text: #0b0e0c; --text-2: #4c5650; --muted: #77817a;
-    --accent: #c6f432; --accent-ink: #0d1300; --accent-text: #456600; --accent-soft: rgba(120,160,0,.13);
-    --node-a: #edf8c4; --node-a-hot: #dcf08e; --edge: #8a938b; --pulse: #5a8500;
-    --code: #10130f; --dot: rgba(0,0,0,.09); --shadow: 0 50px 100px -45px rgba(20,30,10,.45);
-    --nav: rgba(250,251,249,.76);
+    --bg: #f4f2ee; --bg-2: #ebe8e2; --surface: #fcfbf9; --line: #dedad3; --line-2: #c9c3ba;
+    --text: #100d0b; --text-2: #554e48; --muted: #80786f;
+    --accent: #ff5a2e; --accent-ink: #1c0700; --accent-text: #c4380f; --accent-soft: rgba(255,90,46,.1);
+    --node-a: #ffe6dc; --node-a-hot: #ffcab6; --edge: #948b82; --pulse: #c4380f;
+    --code: #14110f; --dot: rgba(0,0,0,.09); --shadow: 0 50px 100px -45px rgba(40,20,10,.4);
+    --nav: rgba(252,251,249,.76);
   }
   :root {
     --sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -58,10 +59,11 @@
 
   /* floating nav */
   nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; width: min(1216px, calc(100% - 28px));
-        display: flex; align-items: center; gap: 28px; height: 58px; padding: 0 10px 0 22px; border-radius: 999px;
+        display: flex; align-items: center; gap: 28px; height: 58px; padding: 0 10px 0 14px; border-radius: 999px;
         background: var(--nav); backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); border: 1px solid var(--line-2); }
-  .brand { font-weight: 700; font-size: 19px; letter-spacing: -.03em; text-decoration: none; display: flex; align-items: center; gap: 9px; }
-  .brand i { width: 11px; height: 11px; border-radius: 3px; background: var(--accent); display: block; transform: rotate(45deg); }
+  .brand { font-weight: 700; font-size: 20px; letter-spacing: -.035em; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  .brand .logo { width: 30px; height: 30px; transition: transform .6s var(--ease); }
+  .brand:hover .logo { transform: rotate(-90deg); }
   nav .links { display: flex; gap: 26px; margin-left: auto; }
   nav .links a { color: var(--text-2); text-decoration: none; font-size: 15px; transition: color .2s; }
   nav .links a:hover { color: var(--text); }
@@ -72,7 +74,7 @@
   .btn:hover { border-color: var(--muted); background: var(--accent-soft); }
   .btn:active { transform: scale(.97); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-  .btn.primary:hover { background: #d4fb55; border-color: #d4fb55; }
+  .btn.primary:hover { background: #ff7650; border-color: #ff7650; }
   .btn.sm { height: 38px; padding: 0 16px; font-size: 14.5px; }
   /* icons are Phosphor (MIT), inlined */
   .ic { width: 1em; height: 1em; flex: none; }
@@ -114,7 +116,7 @@
   .demo-bar .sp { flex: 1; }
   .chip { height: 36px; padding: 0 15px; border-radius: 999px; border: 1px solid #2b3038; background: transparent; color: #9aa2ad; font: 14px var(--mono); cursor: pointer; transition: color .2s, border-color .2s, background .2s; }
   .chip:hover { color: #f0f2f4; border-color: #68707b; }
-  .chip[aria-pressed="true"] { color: #0d1300; border-color: var(--accent); background: var(--accent); }
+  .chip[aria-pressed="true"] { color: #1c0700; border-color: var(--accent); background: var(--accent); }
   .demo-bar .btn { color: #f0f2f4; border-color: #2b3038; }
   .stage { position: relative; height: min(82vh, 780px); min-height: 500px; }
   .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
@@ -122,7 +124,7 @@
   .poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .3; transition: opacity .5s, transform 1.4s var(--ease); }
   .poster:hover img { opacity: .42; transform: scale(1.03); }
   .poster .go { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; width: min(90%, 420px); }
-  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); color: #0d1300; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
+  .poster .play { width: 92px; height: 92px; border-radius: 50%; background: var(--accent); color: #1c0700; display: grid; place-items: center; margin: 0 auto 20px; font-size: 38px; transition: transform .4s var(--ease); }
   .poster:hover .play { transform: scale(1.08); }
   .poster b { display: block; font: 600 24px var(--sans); letter-spacing: -.02em; }
   .poster small { display: block; font: 14.5px var(--sans); margin-top: 8px; opacity: .78; }
@@ -170,7 +172,7 @@
   .subs li { counter-increment: s; font-size: 15.5px; display: flex; gap: 12px; }
   .subs li::before { content: counter(s, decimal-leading-zero); font: 13px var(--mono); color: var(--muted); padding-top: 3px; }
   pre.code { margin: 22px 0 0; padding: 18px 20px; border-radius: 14px; background: var(--code); border: 1px solid #1d2127; font: 13.5px/1.8 var(--mono); color: #d3d7de; overflow-x: auto; }
-  pre.code .k { color: #c6f432; } pre.code .c { color: #7b838e; }
+  pre.code .k { color: #ff8a66; } pre.code .c { color: #7b838e; }
   .params { margin-top: 22px; display: grid; gap: 10px; }
   .params div { display: grid; grid-template-columns: 6.5em 5.5em 1fr; gap: 14px; align-items: baseline; font-size: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
   .params div:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -195,6 +197,14 @@
   figcaption { color: var(--text-2); font-size: 14.5px; margin-top: 12px; }
   figcaption code { font: 13px var(--mono); color: var(--text); }
 
+  /* what it is for: three columns, hairlines between */
+  .uses { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line-2); }
+  .uses > div { padding: 34px 34px 8px 0; }
+  .uses > div + div { padding-left: 34px; border-left: 1px solid var(--line); }
+  .uses .tag { display: inline-block; font: 500 13px var(--mono); color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 4px 12px; }
+  .uses h3 { margin-top: 20px; font-size: 24px; }
+  .uses p { color: var(--text-2); margin-top: 12px; font-size: 16px; }
+
   /* research bento: 5 items, 5 cells */
   .bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 18px; }
   .cell { position: relative; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 30px; overflow: hidden; }
@@ -206,13 +216,31 @@
   .c-arms img { width: 100%; flex: 1; min-height: 0; object-fit: cover; object-position: 50% 40%; transition: transform 1.2s var(--ease); }
   .c-arms > div { padding: 24px 28px 28px; }
   .c-lib { grid-column: span 2; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-  .c-lib p { color: #2c3a05; }
+  .c-lib p { color: #4a1505; }
   .c-lib:hover { border-color: var(--accent); }
   .c-adv { grid-column: span 2; }
   .c-web { grid-column: span 6; display: grid; grid-template-columns: 5fr 7fr; padding: 0; }
   .c-web > div { padding: 38px 34px; align-self: center; }
   .c-web img { width: 100%; height: 100%; max-height: 340px; object-fit: cover; object-position: 50% 45%; transition: transform 1.2s var(--ease); }
   .c-arms:hover img, .c-web:hover img { transform: scale(1.04); }
+
+  /* results: one square per trial */
+  .trials { display: grid; gap: 0; border-top: 1px solid var(--line-2); }
+  .trow { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr) 96px; gap: 28px; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .trow .nm { font-size: 16.5px; line-height: 1.3; }
+  .trow .nm small { display: block; color: var(--muted); font: 13px var(--mono); margin-top: 3px; }
+  .trow .sqs { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); gap: 4px; max-width: 620px; }
+  .sq { display: block; aspect-ratio: 1; border-radius: 4px; background: var(--accent); }
+  .sq.miss { background: transparent; box-shadow: inset 0 0 0 2px var(--text); }
+  .trow .sq { cursor: default; transition: transform .2s var(--ease); }
+  .trow .sq:hover { transform: scale(1.35); }
+  .trow .ct { text-align: right; font: 500 20px var(--mono); letter-spacing: -.02em; }
+  .trow .ct small { color: var(--muted); font-size: 14px; }
+  .tkey { display: flex; gap: 24px; margin-top: 18px; color: var(--text-2); font-size: 14.5px; }
+  .tkey .sq { display: inline-block; width: 13px; vertical-align: -2px; margin-right: 8px; }
+  .tip { position: fixed; z-index: 60; pointer-events: none; background: var(--text); color: var(--bg); font: 13px var(--mono); padding: 6px 10px; border-radius: 8px; opacity: 0; transition: opacity .15s; transform: translate(-50%, calc(-100% - 12px)); white-space: nowrap; }
+  h3.sub { margin: 84px 0 28px; font-size: 28px; }
+  .foot-brand { display: inline-flex; align-items: center; gap: 10px; } .foot-brand .logo { width: 22px; height: 22px; }
 
   /* results */
   .tblwrap { overflow-x: auto; }
@@ -287,8 +315,11 @@
     @keyframes flow { 0% { stroke-dashoffset: .16; opacity: 0; } 2% { opacity: 1; } 11% { opacity: 1; } 13%, 100% { stroke-dashoffset: -1; opacity: 0; } }
     .diagram.in .n.a rect { animation: think 5.2s ease-in-out 2.2s infinite; }
     @keyframes think { 0%, 30%, 100% { fill: var(--node-a); } 12% { fill: var(--node-a-hot); } }
+    .trials .sq { opacity: 0; transform: scale(.3); }
+    .trials.in .sq { opacity: 1; transform: none; transition: opacity .35s var(--ease), transform .45s var(--ease); transition-delay: calc(var(--k) * 9ms + var(--r) * 90ms); }
+    .trials.in .sq:hover { transition-delay: 0s; transform: scale(1.35); }
     .poster .play { animation: beat 2.4s var(--ease) infinite; }
-    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(198,244,50,.45); } 60% { box-shadow: 0 0 0 26px rgba(198,244,50,0); } }
+    @keyframes beat { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,90,46,.45); } 60% { box-shadow: 0 0 0 26px rgba(255,90,46,0); } }
   }
   /* theme change: a circular wipe from the switch, where the browser supports view transitions */
   ::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
@@ -314,6 +345,9 @@
     .hard { gap: 36px; } .pair figure:last-child { margin-top: 28px; }
     .params div { grid-template-columns: 4.8em 4.6em 1fr; gap: 10px; }
     .bento { grid-template-columns: minmax(0, 1fr); }
+    .uses { grid-template-columns: minmax(0, 1fr); } .uses > div, .uses > div + div { padding: 26px 0; border-left: 0; } .uses > div + div { border-top: 1px solid var(--line); }
+    .trow { grid-template-columns: minmax(0, 1fr) auto; gap: 10px 16px; } .trow .sqs { grid-column: 1 / -1; grid-row: 2; }
+    h3.sub { margin-top: 56px; }
     .c-axis, .c-arms, .c-lib, .c-adv, .c-web { grid-column: auto; grid-row: auto; }
     .c-arms img { max-height: 340px; }
     .getit { padding: 28px; gap: 32px; }
@@ -327,8 +361,8 @@
 <div class="progress" aria-hidden="true"></div>
 
 <nav>
-  <a class="brand" href="/"><i></i>Dooms</a>
-  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#run">A real run</a><a href="#results">Results</a></div>
+  <a class="brand" href="/" aria-label="Dooms home"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><path fill="var(--accent-ink)" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="var(--accent-ink)"/></svg>Dooms</a>
+  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#use">Uses</a><a href="#results">Results</a></div>
   <a class="btn sm" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><svg class="ic ph-github-logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>View on GitHub</a>
 </nav>
 
@@ -346,9 +380,9 @@
 </div><div class="hero-fade"></div></header>
 
 <section class="strip" aria-label="Key numbers"><div class="wrap">
-  <div class="it"><b>15 / 15</b><span>recorded episodes solved with live Claude</span></div>
-  <div class="it"><b>8</b><span>model calls for a whole task</span></div>
-  <div class="it"><b>$0.11</b><span>average Bedrock cost per episode</span></div>
+  <div class="it"><b>348 / 350</b><span>simulated trials solved, checked against ground truth</span></div>
+  <div class="it"><b>7 × 50</b><span>task set-ups and random seeds each</span></div>
+  <div class="it"><b>2</b><span>robot arms on one pipeline</span></div>
   <div class="it"><b>0</b><span>servers needed to run the simulator</span></div>
 </div></section>
 
@@ -506,6 +540,15 @@
   </div>
 </div></section>
 
+<section id="use"><div class="wrap">
+  <div class="head rv"><h2>Use it to train models and try out arms</h2></div>
+  <div class="uses">
+    <div class="rv"><span class="tag">Data</span><h3>Generate labelled episodes</h3><p>Every run is seeded and saves the camera frames, 3D keypoints, controller script and a ground-truth success label. That is the raw material for training a manipulation policy.</p></div>
+    <div class="rv"><span class="tag">Models</span><h3>Compare planners on the same seeds</h3><p>Swap the Bedrock model with one flag and read off success rate, cost, latency and grounding error. Ablations turn single stages off.</p></div>
+    <div class="rv"><span class="tag">Arms</span><h3>Bring up a new arm</h3><p>An arm is a profile: joints, gripper, workspace. A Franka Panda and an SO-ARM101 ship today, and the SO-101 can be driven for real over USB.</p></div>
+  </div>
+</div></section>
+
 <section id="research"><div class="wrap">
   <div class="head rv"><h2>What we are studying</h2></div>
   <div class="bento">
@@ -539,9 +582,14 @@
 
 <section id="results"><div class="wrap">
   <div class="head rv">
-    <h2>Results so far</h2>
-    <p class="lede">Live Claude Sonnet 4.5 in simulation, five random seeds per task, averages per episode.</p>
+    <h2>350 trials, every one counted</h2>
+    <p class="lede">Seven set-ups, 50 random seeds each, scored by the simulator's own ground truth. Each square is one trial.</p>
   </div>
+  <div class="trials rv" id="trials" role="img" aria-label="Trials solved per set-up: six set-ups solved 50 of 50, SO-ARM101 stacking solved 48 of 50."></div>
+  <div class="tkey rv"><span><i class="sq"></i>Solved</span><span><i class="sq miss"></i>Not solved</span></div>
+  <p class="caveat rv">Planning in these 350 trials is the scripted reference planner, with simulated pointing noise of 6 pixels (1 pixel after refinement). So this measures grounding, control and execution, not Claude's planning. Both misses were cubes that did not end up stacked. Simulation only.</p>
+
+  <h3 class="sub rv">With live Claude Sonnet 4.5 planning</h3>
   <div class="tblwrap rv">
     <table class="tbl">
       <thead><tr><th>Task</th><th>Solved</th><th class="num">Model calls</th><th class="num">Cost</th><th class="num">Planning time</th><th class="num">Grounding error</th></tr></thead>
@@ -552,7 +600,7 @@
       </tbody>
     </table>
   </div>
-  <p class="caveat rv">Read these as an early check, not a benchmark claim. With 5 episodes per task the 95% interval on each success rate runs from 57% to 100%. Harder scenes (a fallen bottle, a blocked grasp) still fail some of the time. Nothing here was measured on physical hardware.</p>
+  <p class="caveat rv">A much smaller sample: 5 seeds per task, so each success rate has a 95% interval from 57% to 100%. Harder scenes (a fallen bottle, a blocked grasp) still fail some of the time. Nothing here was measured on physical hardware.</p>
 </div></section>
 
 <section id="code"><div class="wrap">
@@ -583,7 +631,7 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 </div></section>
 
 <footer><div class="wrap">
-  <span>Dooms, released under Apache-2.0.</span>
+  <span class="foot-brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><path fill="var(--accent-ink)" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="var(--accent-ink)"/></svg>Dooms, released under Apache-2.0.</span>
   <span>Robot models: <a href="https://github.com/google-deepmind/mujoco_menagerie" rel="noopener">MuJoCo Menagerie</a> and <a href="https://github.com/TheRobotStudio/SO-ARM100" rel="noopener">The Robot Studio SO-ARM100</a>.</span>
 </div></footer>
 
@@ -636,6 +684,19 @@ uv pip install --python .venv/bin/python -e ".[dev]"
     // the dot grid lights up around the cursor
     $("#hero").addEventListener("pointermove", (e) => { const r = e.currentTarget.getBoundingClientRect(); e.currentTarget.style.setProperty("--hx", e.clientX - r.left + "px"); e.currentTarget.style.setProperty("--hy", e.clientY - r.top + "px"); });
   }
+
+  /* trials: runs/trials_scripted (scripts/run_trials.py --llm scripted --seeds 50). misses = seeds that failed */
+  const TRIALS = [
+    ["Put the bottle in the box", "Franka Panda", []], ["Put the red cube in the box", "Franka Panda", []], ["Stack red on blue", "Franka Panda", []],
+    ["Blue cube in the box, cluttered table", "Franka Panda", []], ["Stack blue on red, cluttered table", "Franka Panda", []],
+    ["Put the red cube in the box", "SO-ARM101", []], ["Stack red on blue", "SO-ARM101", [30, 43]],
+  ];
+  $("#trials").innerHTML = TRIALS.map(([name, arm, miss], r) => `<div class="trow"><div class="nm">${name}<small>${arm}</small></div><div class="sqs">${
+    Array.from({ length: 50 }, (_, k) => `<i class="sq${miss.includes(k) ? " miss" : ""}" style="--k:${k};--r:${r}" data-tip="seed ${k}: ${miss.includes(k) ? "not solved" : "solved"}"></i>`).join("")
+  }</div><div class="ct">${50 - miss.length}<small> / 50</small></div></div>`).join("");
+  const tip = document.createElement("div"); tip.className = "tip"; document.body.appendChild(tip);
+  $("#trials").addEventListener("pointermove", (e) => { const t = e.target.closest("[data-tip]"); if (!t) return (tip.style.opacity = 0); const b = t.getBoundingClientRect(); tip.textContent = t.dataset.tip; tip.style.left = b.left + b.width / 2 + "px"; tip.style.top = b.top + "px"; tip.style.opacity = 1; });
+  $("#trials").addEventListener("pointerleave", () => (tip.style.opacity = 0));
 
   /* reveals */
   $$(".bento, .tbl tbody, .pair").forEach((g) => [...g.children].forEach((el, i) => el.style.setProperty("--s", i)));
