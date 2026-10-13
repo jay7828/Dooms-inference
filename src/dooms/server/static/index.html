@@ -18,14 +18,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="preload" as="image" href="/static/landing/studio.jpg">
 <style>
-  /* Tokens. Black and white only: the accent is the ink colour of each theme in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
+  /* Tokens. Black and white, plus one small colour (--pop) kept to a few marks: logo, cursor, progress, diagram signals, star in both themes. Shape rule: controls are pills, surfaces are 20px, media 16px. */
   :root, [data-theme="dark"] {
     --bg: #0a0a0a; --bg-2: #0f0f0f; --surface: #141414; --line: #222222; --line-2: #333333;
     --text: #f2f2f2; --text-2: #a3a3a3; --muted: #6e6e6e;
     --accent: #f2f2f2; --accent-ink: #0a0a0a; --accent-text: #f2f2f2; --accent-soft: rgba(255,255,255,.07);
     --node-a: #1e1e1e; --node-a-hot: #3c3c3c; --edge: #6a6a6a; --pulse: #fafafa;
     --code: #0d0d0d; --dot: rgba(255,255,255,.08); --shadow: 0 50px 110px -40px rgba(0,0,0,.95);
-    --nav: rgba(15,15,15,.72);
+    --nav: rgba(15,15,15,.72); --pop: #ff5a2e;
   }
   [data-theme="light"] {
     --bg: #f4f4f4; --bg-2: #eaeaea; --surface: #fcfcfc; --line: #dcdcdc; --line-2: #c6c6c6;
@@ -33,7 +33,7 @@
     --accent: #0a0a0a; --accent-ink: #f4f4f4; --accent-text: #0a0a0a; --accent-soft: rgba(0,0,0,.06);
     --node-a: #e4e4e4; --node-a-hot: #c4c4c4; --edge: #8a8a8a; --pulse: #0a0a0a;
     --code: #111111; --dot: rgba(0,0,0,.1); --shadow: 0 50px 100px -45px rgba(0,0,0,.35);
-    --nav: rgba(252,252,252,.76);
+    --nav: rgba(252,252,252,.76); --pop: #e8431a;
   }
   :root {
     --sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
@@ -55,7 +55,7 @@
   section { padding: 120px 0; }
   .head { margin-bottom: 52px; }
   :focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }
-  ::selection { background: var(--accent); color: var(--accent-ink); }
+  ::selection { background: var(--pop); color: #fff; }
 
   /* floating nav */
   nav { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; width: min(1216px, calc(100% - 28px));
@@ -81,7 +81,7 @@
   .btn .ic { font-size: 18px; }
   .stars { display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; padding-left: 10px; border-left: 1px solid currentColor; font: 500 13.5px var(--mono); }
   .stars:has(b:empty) { border-left: 0; padding-left: 0; margin-left: 0; }
-  .stars .ic { font-size: 15px; }
+  .stars .ic { font-size: 15px; color: var(--pop); }
   .btn .star { transition: transform .5s var(--ease); }
   .btn:hover .star { transform: rotate(72deg) scale(1.2); }
   .btn.primary .star { color: inherit; }
@@ -99,9 +99,9 @@
   .hero-row > p { color: var(--text-2); font-size: 20px; max-width: 31em; }
   /* command bar: pick a sentence, run it in the engine below */
   .cmd { display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 8px 0 22px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow); }
-  .cmd .pr { color: var(--accent-text); font: 500 16px var(--mono); }
+  .cmd .pr { color: var(--pop); font: 500 16px var(--mono); }
   .cmd .tx { flex: 1; min-width: 0; font: 16px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cmd .tx::after { content: ""; display: inline-block; width: 8px; height: 18px; margin-left: 3px; background: var(--accent-text); vertical-align: -3px; animation: blink 1s steps(2) infinite; }
+  .cmd .tx::after { content: ""; display: inline-block; width: 8px; height: 18px; margin-left: 3px; background: var(--pop); vertical-align: -3px; animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
   .shot-wrap { margin-top: 72px; perspective: 2200px; }
   .shot { border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--r) var(--r) 0 0; overflow: hidden; background: #0b0d10; box-shadow: var(--shadow); transform-origin: 50% 0; }
@@ -152,7 +152,7 @@
   .diagram .e.a { stroke: var(--accent-text); }
   .diagram .e.f { stroke-dasharray: 6 6; }
   .diagram .mk { fill: var(--edge); } .diagram .mka { fill: var(--accent-text); }
-  .pulses path { fill: none; stroke: var(--pulse); stroke-width: 3; stroke-linecap: round; stroke-dasharray: .16 1; stroke-dashoffset: .16; opacity: 0; }
+  .pulses path { fill: none; stroke: var(--pop); stroke-width: 3; stroke-linecap: round; stroke-dasharray: .16 1; stroke-dashoffset: .16; opacity: 0; }
   .legend { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 20px; color: var(--text-2); font-size: 14.5px; }
   .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line-2); vertical-align: -2px; margin-right: 8px; }
   .legend .la { border-color: var(--accent-text); background: var(--node-a); }
@@ -163,18 +163,18 @@
   .rail { position: sticky; top: 120px; align-self: start; }
   .rail ol { list-style: none; margin: 0; padding: 0; position: relative; }
   .rail ol::before { content: ""; position: absolute; left: 8px; top: 14px; bottom: 14px; width: 2px; background: var(--line-2); }
-  .rail ol::after { content: ""; position: absolute; left: 8px; top: 14px; width: 2px; height: calc((100% - 28px) * var(--p, 0)); background: var(--accent-text); transition: height .7s var(--ease); }
+  .rail ol::after { content: ""; position: absolute; left: 8px; top: 14px; width: 2px; height: calc((100% - 28px) * var(--p, 0)); background: var(--pop); transition: height .7s var(--ease); }
   .rail li { position: relative; padding: 0 0 34px 38px; color: var(--muted); transition: color .4s; }
   .rail li:last-child { padding-bottom: 0; }
   .rail li::before { content: ""; position: absolute; left: 0; top: 5px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 2px solid var(--line-2); z-index: 1; transition: border-color .4s, background .4s, transform .5s var(--ease); }
   .rail li b { display: block; font: 600 21px var(--sans); letter-spacing: -.02em; }
   .rail li span { font-size: 14px; }
   .rail li.done { color: var(--text-2); } .rail li.done::before { border-color: var(--accent-text); background: var(--accent-text); }
-  .rail li.on { color: var(--text); } .rail li.on::before { border-color: var(--accent-text); background: var(--accent); transform: scale(1.25); }
+  .rail li.on { color: var(--text); } .rail li.on::before { border-color: var(--pop); background: var(--pop); transform: scale(1.25); }
   .steps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .step { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 34px; opacity: .38; transform: scale(.985); transition: opacity .6s var(--ease), transform .6s var(--ease), border-color .4s; }
   .step.on { opacity: 1; transform: none; border-color: var(--line-2); }
-  .step .who { font: 500 13px var(--mono); color: var(--accent-text); }
+  .step .who { font: 500 13px var(--mono); color: var(--pop); }
   .step h3 { font-size: 28px; margin-top: 8px; }
   .step > p { color: var(--text-2); margin-top: 10px; max-width: 58ch; }
   .step > p.quote { margin-top: 22px; padding: 16px 20px; border-left: 2px solid var(--accent-text); background: var(--bg); border-radius: 0 12px 12px 0; font-size: 16px; color: var(--text); max-width: none; }
@@ -289,7 +289,7 @@
   .theme .ic { grid-area: 1 / 1; transition: transform .6s var(--ease), opacity .3s; }
   [data-theme="dark"] .theme .ph-moon, [data-theme="light"] .theme .ph-sun { opacity: 0; transform: rotate(-90deg) scale(.4); }
 
-  .progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--accent-text); transform: scaleX(0); transform-origin: 0 50%; z-index: 50; pointer-events: none; }
+  .progress { position: fixed; inset: 0 0 auto 0; height: 2px; background: var(--pop); transform: scaleX(0); transform-origin: 0 50%; z-index: 50; pointer-events: none; }
 
   /* ---------- motion, only when the visitor has not asked for less ---------- */
   @media (prefers-reduced-motion: no-preference) {
@@ -372,7 +372,7 @@
 <div class="progress" aria-hidden="true"></div>
 
 <nav>
-  <a class="brand" href="/" aria-label="Dooms home"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><path fill="var(--accent-ink)" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="var(--accent-ink)"/></svg>Dooms</a>
+  <a class="brand" href="/" aria-label="Dooms home"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--pop)"/><path fill="#fff" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="#fff"/></svg>Dooms</a>
   <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#use">Uses</a><a href="#results">Results</a></div>
   <a class="btn sm ghstar" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><svg class="ic ph-github-logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>Star on GitHub<span class="stars"><svg class="ic star" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/></svg><b data-stars></b></span></a>
 </nav>
@@ -645,7 +645,7 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 </div></section>
 
 <footer><div class="wrap">
-  <span class="foot-brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><path fill="var(--accent-ink)" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="var(--accent-ink)"/></svg>Dooms, released under Apache-2.0.</span>
+  <span class="foot-brand"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--pop)"/><path fill="#fff" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="#fff"/></svg>Dooms, released under Apache-2.0.</span>
   <span>Robot models: <a href="https://github.com/google-deepmind/mujoco_menagerie" rel="noopener">MuJoCo Menagerie</a> and <a href="https://github.com/TheRobotStudio/SO-ARM100" rel="noopener">The Robot Studio SO-ARM100</a>.</span>
 </div></footer>
 
