@@ -30,9 +30,10 @@ def test_unparsable_demo_command_reports_error():
 
 def test_static_assets_and_ui_shell_are_served():
     c = TestClient(app)
-    html = c.get("/").text
-    assert "/static/app.js" in html and "/static/app.css" in html and "Connect AWS" in html
-    for f in ("app.js", "app.css", "viewer.js"):
+    assert "/static/studio.html" in c.get("/").text                # the landing page links to the studio
+    html = c.get("/static/studio.html").text
+    assert "/static/app.js" in html and "/static/app.css" in html and "Connect Claude" in html
+    for f in ("app.js", "app.css", "viewer.js", "engine/client.js", "engine/engine.worker.js"):
         assert c.get(f"/static/{f}").status_code == 200
 
 
