@@ -19,5 +19,6 @@ if not (src / "engine" / "engine.worker.js").exists():
 shutil.rmtree(out, ignore_errors=True)
 shutil.copytree(src, out / "static")
 shutil.copy(src / "index.html", out / "index.html")
+shutil.copy(src / "landing" / "favicon.ico", out / "favicon.ico")  # browsers (Safari above all) ask for /favicon.ico when they cannot use the SVG icon
 (out / "static" / "config.js").write_text(f'window.DOOMS_API = "{api}";\n')
 print(f"built {out}" + (f" (real-robot server: {api})" if api else " (browser engine only)"))
