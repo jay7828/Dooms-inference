@@ -390,6 +390,15 @@
   .all-link:hover { border-color: var(--pop); gap: 12px; }
   @media (max-width: 980px) { .proj-grid { grid-template-columns: 1fr 1fr; } .proj.big { grid-row: auto; } }
   @media (max-width: 600px) { .proj-grid { grid-template-columns: 1fr; } .proj.big { grid-column: auto; } }
+  .proj-grid.two { grid-template-columns: 1.45fr 1fr; }
+  .proj-grid.two .proj.big { grid-column: auto; grid-row: auto; }
+  .proj-grid.two .proj-img { aspect-ratio: 16 / 10; }
+  .proj-img.rydu { display: grid; place-items: center; background: #0a0a0a; position: relative; overflow: hidden; }
+  .proj-img.rydu::after { content: ""; position: absolute; inset: auto -20% -60% -20%; height: 90%; background: radial-gradient(closest-side, rgb(42 203 111 / .28), transparent 70%); }
+  .rydu-mark { font-weight: 600; font-size: clamp(42px, 4vw, 64px); letter-spacing: -.04em; color: #2acb6f; position: relative; z-index: 1; transition: letter-spacing .6s var(--ease); }
+  .proj:hover .rydu-mark { letter-spacing: .02em; }
+  .proj .tag { font-size: 12px; font-weight: 500; letter-spacing: 0; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--text-2); }
+  @media (max-width: 760px) { .proj-grid.two { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -670,29 +679,16 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 
 <section id="projects"><div class="wrap">
   <div class="head rv"><h2>Other things we built</h2></div>
-  <div class="proj-grid">
+  <div class="proj-grid two">
     <a class="proj big rv" style="--s:0" href="https://dooms-kappa.vercel.app" rel="noopener">
       <div class="proj-img"><img src="/static/landing/projects/dooms-engine.webp" width="960" height="600" loading="lazy" alt="The dooms.cpp website: robot actions in 267 ms on a laptop"></div>
       <div class="proj-body"><h3>dooms.cpp <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>Our inference engine for Apple Silicon. SmolVLA runs from three cameras to 50 robot actions in 267 ms, 2.3x faster than PyTorch, with C++, C and Python APIs.</p></div>
     </a>
-    <a class="proj rv" style="--s:1" href="https://www.motionintelligence.xyz" rel="noopener">
-      <div class="proj-img"><img src="/static/landing/projects/motion.webp" width="960" height="600" loading="lazy" alt="Motion Intelligence website"></div>
-      <div class="proj-body"><h3>Motion Intelligence <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>A platform for packaging, deploying and running custom video models.</p></div>
-    </a>
-    <a class="proj rv" style="--s:2" href="https://www.dbxstudio.com" rel="noopener">
-      <div class="proj-img"><img src="/static/landing/projects/dbx.webp" width="960" height="512" loading="lazy" alt="DBX Studio, an AI SQL client"></div>
-      <div class="proj-body"><h3>DBX Studio <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>Write SQL in plain English, generated and checked on your own machine.</p></div>
-    </a>
-    <a class="proj rv" style="--s:3" href="https://www.junekids.xyz" rel="noopener">
-      <div class="proj-img"><img src="/static/landing/projects/junekids.webp" width="960" height="600" loading="lazy" alt="June Kids website"></div>
-      <div class="proj-body"><h3>June Kids <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>A storytelling app that writes and narrates personalised stories for children.</p></div>
-    </a>
-    <a class="proj rv" style="--s:4" href="https://sumrlabs.com" rel="noopener">
-      <div class="proj-img logo"><img src="/static/landing/projects/sumr-logo.webp" width="1121" height="266" loading="lazy" alt="SumrLabs"></div>
-      <div class="proj-body"><h3>SumrLabs <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>Clinical summaries and medical-code ranking for healthcare teams.</p></div>
-    </a>
+    <div class="proj rv" style="--s:1">
+      <div class="proj-img rydu" aria-hidden="true"><span class="rydu-mark">RYDU</span></div>
+      <div class="proj-body"><h3>RYDU <span class="tag">in progress</span></h3><p>Ride-hailing for two-wheelers, autos and cabs. The FastAPI and PostGIS backend and a shared Flutter design system are built; the rider and driver apps come next.</p></div>
+    </div>
   </div>
-  <a class="all-link rv" href="https://jayesh-portfolio-hub.vercel.app" rel="noopener">Everything else on the portfolio <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg></a>
 </div></section>
 
 <footer><div class="wrap">
