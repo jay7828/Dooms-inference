@@ -366,6 +366,30 @@
     .stage { height: 78vh; }
     .theme { right: 16px; bottom: 16px; }
   }
+
+  /* other projects: one 2x2 tile and four 1x1 tiles */
+  .proj-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .proj { display: flex; flex-direction: column; text-decoration: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; transition: border-color .3s, transform .5s var(--ease), box-shadow .5s var(--ease); }
+  .proj.big { grid-column: span 2; grid-row: span 2; }
+  .proj:hover { border-color: var(--line-2); transform: translateY(-4px); box-shadow: var(--shadow); }
+  .proj-img { aspect-ratio: 16 / 10; overflow: hidden; background: var(--bg-2); border-bottom: 1px solid var(--line); }
+  .proj.big .proj-img { aspect-ratio: 16 / 11; }
+  .proj-img img { width: 100%; height: 100%; object-fit: cover; object-position: top center; transition: transform .8s var(--ease); }
+  .proj:hover .proj-img img { transform: scale(1.045); }
+  .proj-img.logo { display: grid; place-items: center; background: #f6f6f6; }
+  .proj-img.logo img { width: 58%; height: auto; object-fit: contain; }
+  .proj-body { padding: 18px 20px 22px; }
+  .proj.big .proj-body { padding: 24px 26px 28px; }
+  .proj h3 { font-size: 17px; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .proj.big h3 { font-size: 22px; }
+  .proj h3 .ic { width: 16px; height: 16px; color: var(--muted); transition: transform .35s var(--ease), color .3s; }
+  .proj:hover h3 .ic { transform: translate(3px, -3px); color: var(--pop); }
+  .proj p { color: var(--text-2); font-size: 14.5px; }
+  .proj.big p { font-size: 16px; max-width: 52ch; }
+  .all-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 28px; text-decoration: none; font-weight: 500; border-bottom: 1px solid var(--line-2); padding-bottom: 2px; transition: border-color .3s, gap .3s; }
+  .all-link:hover { border-color: var(--pop); gap: 12px; }
+  @media (max-width: 980px) { .proj-grid { grid-template-columns: 1fr 1fr; } .proj.big { grid-row: auto; } }
+  @media (max-width: 600px) { .proj-grid { grid-template-columns: 1fr; } .proj.big { grid-column: auto; } }
 </style>
 </head>
 <body>
@@ -373,7 +397,7 @@
 
 <nav>
   <a class="brand" href="/" aria-label="Dooms home"><svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--pop)"/><path fill="#fff" d="M9 6.5h6.2a9.5 9.5 0 0 1 9.3 7.6h-6.1a3.4 3.4 0 1 0 0 3.8h6.1a9.5 9.5 0 0 1-9.3 7.6H9z"/><circle cx="15.6" cy="16" r="1.5" fill="#fff"/></svg>Dooms</a>
-  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#use">Uses</a><a href="#results">Results</a></div>
+  <div class="links"><a href="#engine">Live engine</a><a href="#pipeline">Pipeline</a><a href="#use">Uses</a><a href="#results">Results</a><a href="#projects">Projects</a></div>
   <a class="btn sm ghstar" href="https://github.com/jay7828/Dooms-inference" rel="noopener"><svg class="ic ph-github-logo" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></svg>Star on GitHub<span class="stars"><svg class="ic star" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/></svg><b data-stars></b></span></a>
 </nav>
 
@@ -642,6 +666,33 @@ uv pip install --python .venv/bin/python -e ".[dev]"
 .venv/bin/python scripts/run_task.py \
     --task put_bottle_in_box --seed 0 --llm scripted</pre>
   </div>
+</div></section>
+
+<section id="projects"><div class="wrap">
+  <div class="head rv"><h2>Other things we built</h2></div>
+  <div class="proj-grid">
+    <a class="proj big rv" style="--s:0" href="https://dooms-kappa.vercel.app" rel="noopener">
+      <div class="proj-img"><img src="/static/landing/projects/dooms-engine.webp" width="960" height="600" loading="lazy" alt="The dooms.cpp website: robot actions in 267 ms on a laptop"></div>
+      <div class="proj-body"><h3>dooms.cpp <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>Our inference engine for Apple Silicon. SmolVLA runs from three cameras to 50 robot actions in 267 ms, 2.3x faster than PyTorch, with C++, C and Python APIs.</p></div>
+    </a>
+    <a class="proj rv" style="--s:1" href="https://www.motionintelligence.xyz" rel="noopener">
+      <div class="proj-img"><img src="/static/landing/projects/motion.webp" width="960" height="600" loading="lazy" alt="Motion Intelligence website"></div>
+      <div class="proj-body"><h3>Motion Intelligence <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>A platform for packaging, deploying and running custom video models.</p></div>
+    </a>
+    <a class="proj rv" style="--s:2" href="https://www.dbxstudio.com" rel="noopener">
+      <div class="proj-img"><img src="/static/landing/projects/dbx.webp" width="960" height="512" loading="lazy" alt="DBX Studio, an AI SQL client"></div>
+      <div class="proj-body"><h3>DBX Studio <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>Write SQL in plain English, generated and checked on your own machine.</p></div>
+    </a>
+    <a class="proj rv" style="--s:3" href="https://www.junekids.xyz" rel="noopener">
+      <div class="proj-img"><img src="/static/landing/projects/junekids.webp" width="960" height="600" loading="lazy" alt="June Kids website"></div>
+      <div class="proj-body"><h3>June Kids <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>A storytelling app that writes and narrates personalised stories for children.</p></div>
+    </a>
+    <a class="proj rv" style="--s:4" href="https://sumrlabs.com" rel="noopener">
+      <div class="proj-img logo"><img src="/static/landing/projects/sumr-logo.webp" width="1121" height="266" loading="lazy" alt="SumrLabs"></div>
+      <div class="proj-body"><h3>SumrLabs <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></svg></h3><p>Clinical summaries and medical-code ranking for healthcare teams.</p></div>
+    </a>
+  </div>
+  <a class="all-link rv" href="https://jayesh-portfolio-hub.vercel.app" rel="noopener">Everything else on the portfolio <svg class="ic" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor" width="16" height="16"><path d="M221.66,133.66l-72,72a8,8,0,0,1-11.32-11.32L196.69,136H40a8,8,0,0,1,0-16H196.69L138.34,61.66a8,8,0,0,1,11.32-11.32l72,72A8,8,0,0,1,221.66,133.66Z"/></svg></a>
 </div></section>
 
 <footer><div class="wrap">
