@@ -1,12 +1,12 @@
 /** MuJoCo implementation of the simulator + robot interface (Franka Panda or SO-ARM101): port of sim/mujoco_env.py. */
 import {
-  adaptTask, getProfile, type Config, type Dims, type RobotProfile, type TaskSpec,
+  LAB, adaptTask, getProfile, type Config, type Dims, type RobotProfile, type TaskSpec,
 } from './data'
 import { dot, matTVec, matVec, norm, normalize, quatMul, type Mat3, type Vec3, Mat } from './linalg'
 import type { DoubleBuffer, MjData, MjModel, MujocoApi } from './mujocoApi'
 import { compileXml, mountRobot, type AssetSource } from './mujocoLoader'
 import { DefaultRng } from './rng'
-import { buildModelXml } from './sceneBuilder'
+import { buildModelXml, rackEmpty, rackSlotX, tubeRestZ } from './sceneBuilder'
 import { poses } from './sceneExport'
 
 const ARM_JOINTS: Record<string, string[]> = {
@@ -231,7 +231,17 @@ export class MuJoCoEnv {
       mj.mj_resetDataKeyframe(m, d, mj.mj_name2id(m, mj.mjtObj.mjOBJ_KEY.value, 'home'))
     }
     const placed: [number, number][] = []
+    const at: Record<string, [number, number, number]> = {} // x, y, yaw of every placed object
     for (const o of this.task.objects) {
+      const adr = m.jnt_qposadr[mj.mj_name2id(m, mj.mjtObj.mjOBJ_JOINT.value, `${o.name}_free`)]!
+      const holder = o.in ? this.task.objects.find((h) => h.name === o.in) : undefined
+      if (holder && at[holder.name]) {
+        // stands in the first empty slot of its rack
+        const [hx, hy, hyaw] = at[holder.name]!
+        const sx = rackSlotX(holder)[rackEmpty(holder)]!
+        d.qpos.set([hx + Math.cos(hyaw) * sx, hy + Math.sin(hyaw) * sx, LAB.rack_base + tubeRestZ() + 0.0005, 1, 0, 0, 0], adr)
+        continue
+      }
       let x = 0
       let y = 0
       for (let k = 0; k < 200; k++) {
@@ -241,9 +251,10 @@ export class MuJoCoEnv {
       }
       placed.push([x, y])
       const yaw = rng.uniform(o.yaw_range[0], o.yaw_range[1])
+      at[o.name] = [x, y, yaw]
       let quat: number[] = [Math.cos(yaw / 2), 0, 0, Math.sin(yaw / 2)]
       const bid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY.value, o.name)
-      const adr = m.jnt_qposadr[mj.mj_name2id(m, mj.mjtObj.mjOBJ_JOINT.value, `${o.name}_free`)]!
+      if (o.type === 'beaker' && o.liquid) this.fillBeaker(o.name, o.liquid, (o.radius ?? LAB.beaker_r) - LAB.wall, x, y, rng)
       let z = m.body_pos[bid * 3 + 2]!
       if (o.type === 'bottle' && o.lying) {
         // knocked over: axis horizontal, resting on its side
@@ -261,6 +272,32 @@ export class MuJoCoEnv {
     this.applyCtrl()
     const n = Math.trunc(this.cfg.sim.settle_seconds / m.opt.timestep)
     for (let i = 0; i < n; i++) mj.mj_step(m, d)
+  }
+
+  /** Stack the beaker's drops in a loose lattice inside it; they settle into a liquid layer during the settle time. */
+  private fillBeaker(name: string, count: number, inner: number, x: number, y: number, rng: DefaultRng): void {
+    const m = this.model
+    const mj = this.mj
+    const r = LAB.drop_r
+    const pitch = 2 * r + 0.0012
+    const lim = inner - r - 0.001
+    const spots: [number, number][] = []
+    for (let i = -5; i <= 5; i++)
+      for (let j = -5; j <= 5; j++) if (Math.hypot(i * pitch, j * pitch) <= lim) spots.push([i * pitch, j * pitch])
+    for (let k = 0; k < count; k++) {
+      const [dx, dy] = spots[k % spots.length]!
+      const layer = Math.trunc(k / spots.length)
+      const jitter = 0.0004 * (rng.uniform(0, 1) - 0.5)
+      const bid = mj.mj_name2id(m, mj.mjtObj.mjOBJ_BODY.value, `${name}_drop${k}`)
+      const adr = m.jnt_qposadr[m.body_jntadr[bid]!]!
+      this.data.qpos.set([x + dx + jitter, y + dy - jitter, LAB.floor + r + 0.001 + layer * pitch, 1, 0, 0, 0], adr)
+    }
+  }
+
+  /** World positions of a beaker's liquid drops. */
+  dropPositions(name: string): Vec3[] {
+    const o = this.task.objects.find((t) => t.name === name)
+    return Array.from({ length: o?.liquid ?? 0 }, (_, k) => this.objectPos(`${name}_drop${k}`))
   }
 
   // ---------------------------------------------------------------- RobotInterface
@@ -422,7 +459,7 @@ export class MuJoCoEnv {
   freeTableSpot(): Vec3 {
     const objs = this.task.objects.map((o) => this.objectPos(o.name).slice(0, 2))
     const k = this.dims.tray_half / 0.09 // keep-out radii scale with the arm's objects
-    const clear = this.task.objects.map((o) => (o.type === 'tray' ? 0.14 : 0.08) * k)
+    const clear = this.task.objects.map((o) => (o.type === 'tray' || o.type === 'rack' ? 0.14 : o.type === 'beaker' ? 0.1 : 0.08) * k)
     let best: Vec3 = [0, 0, 0]
     let bestScore = -1e9
     const [x0, x1, y1] = this.profile.id === 'franka' ? [0.34, 0.62, 0.34] : [0.11, 0.26, 0.15]
@@ -515,10 +552,11 @@ export class MuJoCoEnv {
 
   /** In-plane edge axis + symmetry for boxy keypoints (cube tops); null / 180 for round ones. */
   gtAxis(name: string): [Vec3 | null, number] {
-    if (!name.startsWith('cube')) return [null, 180]
+    const slot = name.endsWith('_slot') // rack holes: the axis is the row of holes
+    if (!name.startsWith('cube') && !slot) return [null, 180]
     const sid = this.id('mjOBJ_SITE', name)
     const x = this.data.site_xmat
-    return [[x[sid * 9]!, x[sid * 9 + 3]!, x[sid * 9 + 6]!], 90]
+    return [[x[sid * 9]!, x[sid * 9 + 3]!, x[sid * 9 + 6]!], slot ? 180 : 90]
   }
 
   objectPos(name: string): Vec3 {

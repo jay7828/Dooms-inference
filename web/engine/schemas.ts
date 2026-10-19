@@ -139,12 +139,12 @@ export type KeypointRequest = ReturnType<typeof keypointRequest.parse>
 const paramSpec = s.object({
   name: s.string('symbolic parameter used by a controller, e.g. o_z, o_theta, f'),
   description: s.string('what it means physically, so a scene-aware agent can pick a number'),
-  unit: s.enum(['m', 'deg', 'N'] as const),
+  unit: s.enum(['m', 'deg', 'N', 's'] as const),
 })
 export type ParamSpec = ReturnType<typeof paramSpec.parse>
 
 const controllerSpec = s.object({
-  type: s.enum(['PosAlign', 'AxisAlign', 'YawAlign', 'Force', 'Gripper'] as const),
+  type: s.enum(['PosAlign', 'AxisAlign', 'YawAlign', 'Force', 'Gripper', 'Wait'] as const),
   source: s.nullable(s.string(), 'PosAlign: point to move (eef_tcp or a held keypoint). AxisAlign: vector to rotate, e.g. eef_z. YawAlign: eef_y'),
   target: s.nullable(s.string(), 'PosAlign: static reference point. AxisAlign: reference vector'),
   axis: s.nullable(s.string(), 'PosAlign: x|y|z. Force: x|y|z|-x|-y|-z'),
@@ -185,7 +185,7 @@ export const SkillPlanSchema = schema('skill_plan', 'One stored skill to reuse, 
 const paramValue = s.object({
   subtask_id: s.int(),
   name: s.string(),
-  value: s.number('metres, degrees or newtons according to the parameter\'s unit'),
+  value: s.number('metres, degrees, newtons or seconds according to the parameter\'s unit'),
   rationale: s.string('short justification', ''),
 })
 export type ParamValue = ReturnType<typeof paramValue.parse>
