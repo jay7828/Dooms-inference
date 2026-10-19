@@ -404,6 +404,25 @@ export class Gripper extends Controller {
   }
 }
 
+/** Hold still for `seconds` (the stage's other controllers keep the pose): lets a poured liquid run out, a part settle. */
+export class Wait extends Controller {
+  readonly name = 'Wait'
+  constructor(public seconds: number, priority = 1, stage = 0) {
+    super()
+    this.priority = priority
+    this.stage = stage
+  }
+  term(): TaskTerm | null {
+    return null
+  }
+  finished(ctx: Context): boolean {
+    return ctx.t_stage >= this.seconds
+  }
+  override describe(): string {
+    return `Wait(${f(this.seconds, 1)} s)`
+  }
+}
+
 // ------------------------------------------------------------------------------------------------ prioritised stack
 
 /** Damped pseudo-inverse of JN plus an exact projector onto its row space (for the next null space). */
@@ -499,6 +518,17 @@ Gripper(action)
   action = open | close | width. \`open\` releases, \`close\` grasps whatever is between the fingers,
   \`width\` sets an explicit opening in metres (parameter name g). Max opening {max_width} m.
 
+Wait(seconds)
+  Holds the current pose for \`seconds\` (parameter name w, unit s, at most 5). Use it in a stage of its own, e.g. to let a
+  poured liquid run out before tilting the container back.
+
+Pouring: grasp an open container high on its rim with the fingers closing ACROSS the pour direction (YawAlign(eef_y,
+  world_x, 0) to pour toward +/-y), carry it upright, then tilt it about the fingertips while three PosAlign(eef_tcp,
+  eef_tcp, x|y|z, 0) hold them in place: first AxisAlign(eef_z, world_y, 30) (mouth 60 deg toward -y; 150 for +y) to fix
+  the tilt direction, then AxisAlign(eef_z, world_z, 60) (mouth 120 deg from upright), then Wait, then
+  AxisAlign(eef_z, world_z, 180) to stand it back up. The liquid leaves the lowest point of the rim, close to the
+  fingertips, so hold the fingertips about 10 cm above the target's rim.
+
 Relative moves: PosAlign(eef_tcp, eef_tcp, axis, offset) moves the gripper by \`offset\` along \`axis\` from where it is
 when the stage starts (lift, retract, sideways push). With the gripper closed this is how an object is pushed.
 
@@ -536,6 +566,7 @@ export function buildController(spec: ControllerSpec, values: Record<string, num
     case 'YawAlign': return new YawAlign(spec.source!, spec.target!, rad(val(90)), spec.priority, spec.stage)
     case 'Force': return new Force(spec.axis ?? '-z', val(3), spec.priority, spec.stage)
     case 'Gripper': return new Gripper(spec.action ?? 'open', spec.param ? (values[spec.param] ?? null) : null, spec.priority, spec.stage)
+    case 'Wait': return new Wait(val(1), spec.priority, spec.stage)
   }
 }
 

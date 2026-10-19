@@ -1,6 +1,6 @@
 /** Compiler (recipe + numbers -> staged controllers) and Runtime (the 50 Hz control loop): execution/*.py */
 import {
-  Controller, PosAlign, buildController, solveStack, type Context, type ExecCfg, type Keypoint, type RobotInterface,
+  Controller, PosAlign, Wait, buildController, solveStack, type Context, type ExecCfg, type Keypoint, type RobotInterface,
   type TaskTerm,
 } from './controllers'
 import { matMulT, matToRotvec } from './linalg'
@@ -163,7 +163,7 @@ export class Runtime {
         if (window.length > windowLen) window.shift()
         if (window.length === windowLen && ts > STALL_SECONDS + 0.5) {
           const tctx = mkCtx(s, keypoints, ts)
-          const stuck = stage.filter((ctl) => !ctl.finished(tctx)).map((ctl) => ctl.describe())
+          const stuck = stage.filter((ctl) => !ctl.finished(tctx) && !(ctl instanceof Wait)).map((ctl) => ctl.describe()) // holding still on purpose
           if (stuck.length) {
             let ptp = 0
             for (let k = 0; k < window[0]!.length; k++) {

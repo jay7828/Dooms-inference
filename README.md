@@ -152,10 +152,27 @@ agent pipeline, the skill library and an activity log with cost and token counts
 * **Fallen objects and infeasible tasks**: the Scout describes object states first. A lying bottle is grasped across
   its width; if the task cannot be done with a top-down parallel gripper it says so instead of trying.
 * Scenes: `sandbox`, `sandbox_fallen` (bottle knocked over), `sandbox_blocked` (box right beside a lying bottle),
-  `put_bottle_in_box`, `put_cube_in_box`, `stack_cubes`. Add one by dropping a YAML in `configs/tasks/`.
+  `put_bottle_in_box`, `put_cube_in_box`, `stack_cubes`, and the lab scenes below. Add one by dropping a YAML in
+  `configs/tasks/` (browser scenes live in `web/engine/data.ts`).
 
 The harder scenes (`sandbox_fallen`, `sandbox_blocked`) are not in the results above; in small exploratory runs with
 Claude they still fail some of the time.
+
+### Biochemistry lab (browser engine, Franka only)
+
+Two scenes on a lab bench (white bench top, reagent shelf, flasks, stirrer, pipettes as decoration):
+
+* `lab_pour_liquid`: "pour the blue liquid into the empty beaker". The liquid is 45 frictionless, damped drops that
+  collide only with glass, bench and floor (not with each other or the arm), which keeps a step under 5 ms. The
+  plan grips the octagonal beaker high on its rim with the fingers across the pour direction, carries it upright,
+  tilts it 120 degrees about the fingertips, holds with the new `Wait(seconds)` controller while it runs out, stands it
+  back up and sets it down. Scored by the `poured` predicate: at least 60% of the drops end up in the target beaker.
+* `lab_test_tube`: "place the test tube in the empty slot of the rack". The tube stands in a one-hole stand; the
+  rack's other holes hold capped tubes, so the fingers must open across the row (`YawAlign` on `rack_slot_axis`).
+  Scored by `in_slot`: the tube is centred in the hole, lowered in, upright and still.
+
+Demo planner: 20 / 20 seeds poured and 12 / 12 tubes placed (simulation, browser engine run under Node). Not yet run
+with Claude, and not ported to the Python server.
 
 ## Benchmarking
 

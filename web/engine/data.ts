@@ -126,7 +126,7 @@ export interface RobotProfile {
 export const FRANKA: RobotProfile = {
   id: 'franka', label: 'Franka Panda', dof: 7, max_width: 0.08, grasp_min_width: 0.008, force_sensor: true,
   dims: DEFAULT_DIMS,
-  scenes: ['sandbox', 'sandbox_fallen', 'sandbox_blocked', 'put_bottle_in_box', 'put_cube_in_box', 'stack_cubes'],
+  scenes: ['sandbox', 'sandbox_fallen', 'sandbox_blocked', 'put_bottle_in_box', 'put_cube_in_box', 'stack_cubes', 'lab_pour_liquid', 'lab_test_tube'],
   table_center: [0.45, 0.0], table_half: [0.6, 0.65], remap: null, max_radius: null, min_separation: null,
   scene_cam: { pos: [0.95, -0.55, 0.8], lookat: [0.45, 0.0, 0.06], fovy: 55 },
   view: { pos: [1.62, -1.15, 1.2], target: [0.42, 0.02, 0.1] },
@@ -167,16 +167,27 @@ export const profileSummary = (p: RobotProfile) => ({
 
 export interface ObjectSpec {
   name: string
-  type: 'bottle' | 'tray' | 'cube'
+  type: 'bottle' | 'tray' | 'cube' | 'beaker' | 'tube' | 'rack'
   x_range: Range
   y_range: Range
   yaw_range: Range
   color: [number, number, number]
   size: number
   lying: boolean
+  /** beaker: outer radius / height (m) */
+  radius?: number
+  height?: number
+  /** beaker: number of liquid particles it starts with (0 = empty) */
+  liquid?: number
+  /** rack: number of slots in a row along its x axis, and the ones already holding a tube (1-based) */
+  slots?: number
+  filled?: number[]
+  /** tube: the rack it starts standing in (placed in that rack's first empty slot) */
+  in?: string
 }
 export interface SuccessPredicate {
-  type: 'inside' | 'on_top' | 'outside'
+  /** poured: most of `object`'s liquid ended up in beaker `target`; in_slot: tube `object` stands in rack slot keypoint `target` */
+  type: 'inside' | 'on_top' | 'outside' | 'poured' | 'in_slot'
   object: string
   target: string
 }
@@ -189,6 +200,8 @@ export interface TaskSpec {
   success: SuccessPredicate[]
   min_object_separation: number
   seed_variation: boolean
+  /** 'lab': a biochemistry bench (white bench top, reagent shelf, glassware) instead of the plain grey table */
+  environment?: 'lab'
 }
 
 type ObjIn = Partial<ObjectSpec> & Pick<ObjectSpec, 'name' | 'type' | 'x_range' | 'y_range'>
@@ -197,6 +210,15 @@ const BOTTLE_COLOR: [number, number, number] = [0.45, 0.7, 0.95]
 const BOX_COLOR: [number, number, number] = [0.22, 0.22, 0.24]
 const RED: [number, number, number] = [0.85, 0.15, 0.15]
 const BLUE: [number, number, number] = [0.15, 0.3, 0.9]
+
+/** Lab glassware (Franka scale, metres). */
+export const LAB = {
+  beaker_r: 0.03, beaker_h: 0.09, big_r: 0.045, big_h: 0.075, wall: 0.006, floor: 0.012, drops: 45, drop_r: 0.007, drop_drag: 0.03,
+  tube_r: 0.0075, tube_len: 0.11, hole: 0.024, pitch: 0.04, rack_top: 0.055, rack_base: 0.006, rack_w: 0.05,
+}
+const GLASS: [number, number, number] = [0.82, 0.9, 0.95]
+const RACK_COLOR: [number, number, number] = [0.94, 0.94, 0.92]
+const TUBE_LIQUID: [number, number, number] = [0.3, 0.75, 0.35]
 
 const KP_BOTTLE_CAP = "the top of the bottle's small cap (a top-down grasp point only while the bottle STANDS upright; on a bottle lying on its side this surface faces sideways)"
 const KP_BOX = "centre of the box's interior floor"
@@ -281,6 +303,33 @@ const TASK_LIST: TaskSpec[] = [
     scene_context: `${BASE_CTX} Both cubes are 0.04 m on each side. The parallel gripper opens to at most 0.08 m.`,
     success: [{ type: 'on_top', object: 'cube_red', target: 'cube_blue' }], min_object_separation: 0.16, seed_variation: true,
   },
+  {
+    name: 'lab_pour_liquid', instruction: 'pour the blue liquid into the empty beaker', environment: 'lab',
+    objects: [
+      obj({ name: 'beaker_blue', type: 'beaker', x_range: [0.44, 0.54], y_range: [0.14, 0.22], color: GLASS, radius: LAB.beaker_r, height: LAB.beaker_h, liquid: LAB.drops }),
+      obj({ name: 'beaker_empty', type: 'beaker', x_range: [0.46, 0.54], y_range: [-0.2, -0.12], color: GLASS, radius: LAB.big_r, height: LAB.big_h, liquid: 0 }),
+    ],
+    keypoints: {
+      beaker_blue_rim: 'centre of the open mouth (top rim) of the small beaker that holds the blue liquid',
+      beaker_empty_rim: 'centre of the open mouth (top rim) of the larger, empty beaker',
+    },
+    scene_context: `${BASE_CTX} A biochemistry lab bench. Objects on the bench: a small octagonal glass beaker (${LAB.beaker_r * 200} cm across, ${LAB.beaker_h * 100} cm tall, 6 mm thick walls) holding a layer of blue liquid, and a larger empty glass beaker (${LAB.big_r * 200} cm across, ${LAB.big_h * 100} cm tall). The shelf, bottles, flasks, stirrer and pipettes at the back of the bench are out of reach and not part of the task. Keep the small beaker upright while carrying it or the liquid spills; the liquid runs out over the rim once the beaker is tilted well past 90 degrees, and takes about a second to run out. Leave the empty beaker where it is. The parallel gripper opens to at most 0.08 m.`,
+    success: [{ type: 'poured', object: 'beaker_blue', target: 'beaker_empty' }], min_object_separation: 0.2, seed_variation: true,
+  },
+  {
+    name: 'lab_test_tube', instruction: 'place the test tube in the empty slot of the rack', environment: 'lab',
+    objects: [
+      obj({ name: 'stand', type: 'rack', x_range: [0.46, 0.54], y_range: [0.14, 0.22], color: RACK_COLOR, slots: 1, filled: [] }),
+      obj({ name: 'tube', type: 'tube', x_range: [0, 0], y_range: [0, 0], color: TUBE_LIQUID, in: 'stand' }),
+      obj({ name: 'rack', type: 'rack', x_range: [0.46, 0.54], y_range: [-0.2, -0.12], color: RACK_COLOR, slots: 4, filled: [1, 2, 4] }),
+    ],
+    keypoints: {
+      tube_top: 'centre of the open top end of the loose test tube (the one standing alone in the small single-hole stand)',
+      rack_slot: 'centre of the one EMPTY hole in the top plate of the test-tube rack (the other holes already hold tubes)',
+    },
+    scene_context: `${BASE_CTX} A biochemistry lab bench. Objects on the bench: a glass test tube (${LAB.tube_r * 200} cm wide, ${(LAB.tube_len * 100).toFixed(0)} cm long, round bottom, holding a little green sample) standing upright in a small single-hole stand, and a white test-tube rack: a row of 4 square holes (${(LAB.hole * 100).toFixed(1)} cm wide, ${LAB.pitch * 100} cm apart) in a top plate ${(LAB.rack_top * 100).toFixed(1)} cm above the bench. Three holes already hold capped tubes; one is empty. Lift the tube until its bottom clears the stand (the stand's top is also ${(LAB.rack_top * 100).toFixed(1)} cm high), carry it upright, and lower it straight down into the empty hole until it rests on the rack's base. The capped tubes stand right beside the empty hole, so the fingers must open ACROSS the row of holes, never along it. The shelf, bottles, flasks, stirrer and pipettes at the back of the bench are out of reach and not part of the task. The parallel gripper opens to at most 0.08 m.`,
+    success: [{ type: 'in_slot', object: 'tube', target: 'rack_slot' }], min_object_separation: 0.2, seed_variation: true,
+  },
 ]
 export const TASKS: Record<string, TaskSpec> = Object.fromEntries(TASK_LIST.map((t) => [t.name, t]))
 
@@ -290,6 +339,8 @@ export const SCENE_ORDER = ['sandbox', 'sandbox_fallen', 'sandbox_blocked', ...O
 export const EXAMPLES: Record<string, string[]> = {
   sandbox_blocked: ['pick up the bottle and put it on the table', 'put the bottle on the table away from the box'],
   sandbox_fallen: ['pick up the bottle and put it on the table away from the box', 'put the bottle into the box', 'put the blue cube into the box'],
+  lab_pour_liquid: ['pour the blue liquid into the empty beaker'],
+  lab_test_tube: ['place the test tube in the empty slot of the rack', 'put the test tube in the rack'],
   sandbox: ['put the bottle into the box', 'put the blue cube into the box', 'stack the red cube on top of the blue cube', 'put the blue cube on the red cube'],
 }
 

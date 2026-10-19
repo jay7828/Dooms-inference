@@ -7,6 +7,10 @@ const WORDS: [string, RegExp][] = [
   ['cube_blue', /\bblue\b(?:\s+(?:cube|block))?|\bblue\s+one\b/],
   ['bottle', /\bbottle\b/],
   ['box', /\b(?:box|tray|bin)\b/],
+  ['beaker_blue', /\b(?:blue (?:liquid|solution|beaker)|liquid|solution|small beaker|full beaker)\b/],
+  ['beaker_empty', /\b(?:empty|large|big|other|second) beaker\b|\binto (?:the )?beaker\b/],
+  ['tube', /\b(?:test )?tube\b/],
+  ['rack', /\brack\b/],
 ]
 const OUTSIDE = /\b(?:outside(?: of)?|out of|beside|next to|away from|on the table|on the free|free (?:spot|space))\b/
 
@@ -31,6 +35,8 @@ export function parseCommand(text: string, task: TaskSpec): [string, string] | n
 
 export function predicateFor(pick: string, dest: string): SuccessPredicate {
   if (dest === 'table') return { type: 'outside', object: pick, target: 'box' }
+  if (pick.startsWith('beaker')) return { type: 'poured', object: pick, target: dest }
+  if (dest === 'rack') return { type: 'in_slot', object: pick, target: 'rack_slot' }
   return { type: dest === 'box' ? 'inside' : 'on_top', object: pick, target: dest }
 }
 

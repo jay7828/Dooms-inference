@@ -39,6 +39,8 @@ export interface ScriptNumbers {
  *  works a few centimetres above the table (its top-down reach ends near 0.08 m) so everything is small. */
 export function scriptNumbers(profile: RobotProfile, obj: string, dest: string, lying: boolean): ScriptNumbers {
   const isCube = obj.startsWith('cube')
+  if (obj.startsWith('tube')) // held by its top: lift its round bottom clear of the stand, lower it into the hole by force
+    return { hover: 0.1, grasp: -0.014, lift: 0.12, hover_dest: 0.15, place_force: 2.0, place_z: null, retract: 0.12 }
   if (profile.id === 'franka')
     return {
       hover: 0.12, grasp: isCube ? -0.014 : lying ? -0.02 : -0.016, lift: isCube || lying ? 0.15 : 0.2,
@@ -55,7 +57,119 @@ export function scriptNumbers(profile: RobotProfile, obj: string, dest: string, 
   }
 }
 
-type Plan = { dec: Decomposition; rec: SkillRecipes | null; par: ParameterGroundings | null }
+/** `skills`: the skill name of each recipe, when the plan is not the standard six-step pick and place. */
+type Plan = { dec: Decomposition; rec: SkillRecipes | null; par: ParameterGroundings | null; skills?: string[] }
+
+/** Direction the demo planner tilts a beaker to pour: the mouth turns toward world -y (the arm's right). */
+const POUR_AXIS = 'world_y'
+const POUR_SIGN = -1
+
+/**
+ * Pouring (lab scene): grasp the beaker's rim from above with the fingers closing along the pour direction (so the tilt
+ * turns the beaker about an axis the two finger pads hold rigidly, not about the pinch line), carry it upright over the
+ * target, tilt it 120 degrees about the fingertips in two stages (first 60 degrees toward the pour direction, which
+ * fixes the tilt plane, then on to 60 degrees past horizontal), tilt it back, and set it down on a free spot.
+ */
+export function pourPlan(task: TaskSpec, pair: [string, string] | null): Plan {
+  const [src, dst] = pair ?? [task.success[0]!.object, task.success[0]!.target]
+  const K = keypointFor(task, src)
+  const D = keypointFor(task, dst)
+  const T = 'table_free_spot'
+  const C = mkController
+  const P = (name: string, description: string, unit: ParamSpec['unit']): ParamSpec => ({ name, description, unit })
+  const nice = (x: string) => x.replace(/_/g, ' ')
+  const xyz = (src_: string, tgt: string, stage = 0): ControllerSpec[] =>
+    (['x', 'y', 'z'] as const).map((a) => C({ type: 'PosAlign', source: src_, target: tgt, axis: a, param: `o_${a}`, priority: 1, stage }))
+  const hold = (stage: number): ControllerSpec[] =>
+    (['x', 'y', 'z'] as const).map((a) => C({ type: 'PosAlign', source: 'eef_tcp', target: 'eef_tcp', axis: a, param: 'o_hold', priority: 1, stage }))
+  const holdP = P('o_hold', 'keep the fingertips where they are (0 m)', 'm')
+  const up = C({ type: 'AxisAlign', source: 'eef_z', target: 'world_z', param: 'o_theta', priority: 2 })
+  const yaw = C({ type: 'YawAlign', source: 'eef_y', target: POUR_AXIS, param: 'o_yaw', priority: 2 }) // o_yaw 90: fingers on the sides, the lip free
+  const xyzP = [P('o_x', 'x offset', 'm'), P('o_y', 'y offset', 'm')]
+  const names = [
+    `Approach the ${nice(src)} from above`, `Grasp the ${nice(src)} at its rim`, `Lift the ${nice(src)} upright`,
+    `Carry it upright over the ${nice(dst)}`, `Tilt the ${nice(src)} to pour`, 'Tilt it back upright',
+    'Carry it over a free spot on the bench', `Set the ${nice(src)} down`, 'Release and retract',
+  ]
+  const subtasks: Subtask[] = names.map((n, i) => ({ id: i + 1, name: n, description: n }))
+  const recipes: SkillRecipe[] = [
+    {
+      subtask_id: 1, keypoints: [], params: [...xyzP, P('o_z', 'hover height above the rim', 'm'), P('o_theta', 'gripper vs world up', 'deg'), P('o_yaw', 'finger direction vs the pour direction', 'deg')],
+      controllers: [...xyz('eef_tcp', K), up, yaw],
+    },
+    {
+      subtask_id: 2, keypoints: [], params: [...xyzP, P('o_z', 'fingertip height relative to the rim (negative = below)', 'm'), P('o_theta', 'gripper vs world up', 'deg'), P('o_yaw', 'finger direction vs the pour direction', 'deg')],
+      controllers: [...xyz('eef_tcp', K), up, yaw, C({ type: 'Gripper', action: 'close', stage: 1 })],
+    },
+    { subtask_id: 3, keypoints: [], params: [...xyzP, P('o_z', 'lift height', 'm'), P('o_theta', 'keep upright', 'deg')], controllers: [...xyz(K, K), up] },
+    { subtask_id: 4, keypoints: [], params: [...xyzP, P('o_z', 'height of the held rim above the target rim', 'm'), P('o_theta', 'keep upright', 'deg')], controllers: [...xyz(K, D), up] },
+    {
+      subtask_id: 5, keypoints: [],
+      params: [holdP, P('o_tilt1', 'gripper axis vs the pour axis: 30 tilts the mouth 60 deg toward -axis, 150 toward +axis', 'deg'), P('o_tilt2', 'final gripper axis vs world up (60 = mouth 120 deg from upright)', 'deg'), P('w', 'time for the liquid to run out', 's')],
+      controllers: [
+        ...hold(0), C({ type: 'AxisAlign', source: 'eef_z', target: POUR_AXIS, param: 'o_tilt1', priority: 2, stage: 0 }),
+        ...hold(1), C({ type: 'AxisAlign', source: 'eef_z', target: 'world_z', param: 'o_tilt2', priority: 2, stage: 1 }),
+        ...hold(2), C({ type: 'Wait', param: 'w', stage: 2 }),
+      ],
+    },
+    { subtask_id: 6, keypoints: [], params: [holdP, P('o_theta', 'back to pointing straight down', 'deg')], controllers: [...hold(0), up] },
+    { subtask_id: 7, keypoints: [], params: [...xyzP, P('o_z', 'height of the held rim above the free spot', 'm'), P('o_theta', 'keep upright', 'deg')], controllers: [...xyz(K, T), up] },
+    {
+      subtask_id: 8, keypoints: [], params: [...xyzP, P('f', 'contact force', 'N'), P('o_theta', 'keep upright', 'deg')],
+      controllers: [...xyz(K, T).filter((c) => c.axis !== 'z'), C({ type: 'Force', axis: '-z', param: 'f' }), up],
+    },
+    {
+      subtask_id: 9, keypoints: [], params: [P('o_z', 'retract height', 'm')],
+      controllers: [C({ type: 'Gripper', action: 'open', stage: 0 }), C({ type: 'PosAlign', source: 'eef_tcp', target: 'eef_tcp', axis: 'z', param: 'o_z', stage: 1 })],
+    },
+  ]
+  const tilt1 = POUR_SIGN < 0 ? 30 : 150
+  const values: Record<number, Record<string, number>> = {
+    1: { o_x: 0, o_y: 0, o_z: 0.1, o_theta: 180, o_yaw: 90 },
+    2: { o_x: 0, o_y: 0, o_z: -0.018, o_theta: 180, o_yaw: 90 }, // high on the rim: the palm must stay clear of the mouth
+    3: { o_x: 0, o_y: 0, o_z: 0.12, o_theta: 180 },
+    4: { o_x: 0, o_y: 0, o_z: 0.13, o_theta: 180 },
+    5: { o_hold: 0, o_tilt1: tilt1, o_tilt2: 60, w: 1.5 },
+    6: { o_hold: 0, o_theta: 180 },
+    7: { o_x: 0, o_y: 0, o_z: 0.2, o_theta: 180 }, // high enough to pass over the now-full target
+    8: { o_x: 0, o_y: 0, f: 2.0, o_theta: 180 },
+    9: { o_z: 0.15 },
+  }
+  const par: ParameterGroundings = {
+    values: Object.entries(values).flatMap(([sid, d]) => Object.entries(d).map(([n, v]) => ({ subtask_id: Number(sid), name: n, value: v, rationale: 'reference' }))),
+  }
+  for (const r of recipes) r.keypoints = referencedKeypoints(r.controllers).filter((n) => n in DEFINED).map((n) => ({ name: n, description: DEFINED[n]! }))
+  const skills = ['approach_vessel', 'grasp_vessel_rim', 'lift_vessel_upright', 'carry_over_upright', 'tilt_to_pour', 'tilt_back_upright',
+    'carry_over_upright', 'set_down_on_contact', 'release_and_retract']
+  return {
+    dec: mkDecomposition({ observations: `The ${nice(src)} stands upright and holds the liquid; the ${nice(dst)} is empty.`, subtasks }),
+    rec: { recipes }, par, skills,
+  }
+}
+
+const POUR_DESC: Record<string, string> = {
+  approach_vessel: 'Move the gripper above the rim of an open vessel, pointing straight down, fingers turned along the pour direction.',
+  grasp_vessel_rim: 'Lower the open fingers around the rim of an open vessel and close them.',
+  lift_vessel_upright: 'Lift the held vessel straight up without tilting it.',
+  carry_over_upright: 'Carry the held vessel upright and hover it above a destination point.',
+  tilt_to_pour: 'Keep the fingertips in place and tilt the held vessel past horizontal so its contents pour out over the rim.',
+  tilt_back_upright: 'Keep the fingertips in place and turn the held vessel back upright.',
+  set_down_on_contact: 'Lower the held vessel upright until it touches the surface below.',
+}
+
+/** Skill choices for a plan that names its own skills (`plan.skills`). */
+function namedToPlan(plan: Plan, libraryNames: Set<string>): SkillPlan {
+  const choices = plan.rec!.recipes.map((r, i) => {
+    const name = plan.skills![i]!
+    const refs = referencedKeypoints(r.controllers)
+    const bindings: Record<string, string> = Object.fromEntries(refs.map((k, j) => [j === 0 ? 'obj' : j === 1 ? 'dest' : `kp${j}`, k]))
+    const defined = r.keypoints.filter((k) => k.name in DEFINED)
+    return libraryNames.has(name)
+      ? mkChoice({ subtask_id: r.subtask_id, skill_name: name, role_bindings: bindings, keypoints: defined })
+      : mkChoice({ subtask_id: r.subtask_id, skill_name: name, role_bindings: bindings, keypoints: [], description: POUR_DESC[name] ?? SKILL_DESC[name] ?? name, recipe: r })
+  })
+  return { choices }
+}
 
 export function referencePlan(task: TaskSpec, pair: [string, string] | null, lyingIn: boolean, profile: RobotProfile = FRANKA): Plan {
   const [obj, dest] = pair ?? [task.success[0]!.object, task.success[0]!.target]
@@ -91,7 +205,7 @@ export function referencePlan(task: TaskSpec, pair: [string, string] | null, lyi
   const isCube = obj.startsWith('cube')
   const grasp_yaw = isCube || lying // boxy or lying objects: fingers across the width
   const yawTarget = lying ? `${K}__to__${KE}` : `${K}_axis`
-  const destCube = D.startsWith('cube')
+  const destCube = D.startsWith('cube') || D.endsWith('_slot') // edges to align with: a cube's faces, a rack's row of holes
   const dyaw = destCube ? [C({ type: 'YawAlign', source: 'eef_y', target: `${D}_axis`, param: 'o_yaw', priority: 2 })] : []
   const dyp = destCube ? [P('o_yaw', 'finger direction vs destination edge', 'deg')] : []
   const downD = C({ type: 'AxisAlign', source: 'eef_z', target: NRM(D), param: 'o_theta', priority: 2 })
@@ -365,7 +479,9 @@ export class ScriptedLLM implements LLM {
     // built lazily, from the scene as it is when planning starts (after any reset)
     if (!this.plansCache) {
       const lying = this.task.objects.some((o) => o.type === 'bottle' && o.lying) && this.env.bottleLying()
-      const full = referencePlan(this.task, this.pair, lying, this.env.profile)
+      const pick = this.pair?.[0] ?? this.task.success[0]?.object ?? ''
+      const pours = this.task.objects.find((o) => o.name === pick)?.type === 'beaker'
+      const full = pours ? pourPlan(this.task, this.pair) : referencePlan(this.task, this.pair, lying, this.env.profile)
       this.plansCache = [full, mergePlan(full.dec, full.rec, full.par), lying]
     }
     return this.plansCache
@@ -395,7 +511,8 @@ export class ScriptedLLM implements LLM {
         if (this.mode === 'clear') out = pushToPlan(this.clear!.rec!, names)
         else {
           const p = this.plans()
-          out = this.single(text) ? mergedToPlan(p[1].rec!) : toPlan(p[0].rec!, this.task, this.pair, p[2], names, this.env.profile.force_sensor)
+          out = this.single(text) ? mergedToPlan(p[1].rec!)
+            : p[0].skills ? namedToPlan(p[0], names) : toPlan(p[0].rec!, this.task, this.pair, p[2], names, this.env.profile.force_sensor)
         }
         break
       }
