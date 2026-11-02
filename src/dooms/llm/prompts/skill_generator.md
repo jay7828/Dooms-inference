@@ -15,7 +15,7 @@ Rules
   the box). eef_tcp (gripper fingertip centre) and eef_z (gripper pointing direction) are built in and must NOT
   be listed in `keypoints`; only list object keypoints that the subtask's controllers reference.
 - Every controller number comes from a symbolic parameter: set `param` on the controller and declare
-  the parameter in `params` with a physical description and a unit (m, deg, N). Parameter names are per
+  the parameter in `params` with a physical description and a unit (m, deg, N; s for Wait). Parameter names are per
   subtask (o_x, o_y, o_z, o_theta, f, g, ...). If one subtask uses several offsets along the same axis
   give them distinct names (o_z_hover, o_z_final).
 - Reaching a 3D position needs PosAlign on x, y and z. Keep the gripper pointing straight down with

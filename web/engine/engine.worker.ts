@@ -3,6 +3,7 @@
  * Web Worker that runs a Dooms simulation session (MuJoCo WASM + the whole pipeline) off the main thread.
  * Protocol with LocalSession (main thread):
  *   in : { op: 'init', mujocoUrl } | { op: 'cmd', msg } | { op: 'stop' } | { op: 'scene', id, name, seed, robot }
+ *        | { op: 'imitate_scene', id, task, robot }
  *   out: { kind: 'ready' } | { kind: 'event', ev } | { kind: 'pose', t, poses } | { kind: 'frame', jpeg }
  *        | { kind: 'reply', id, ok, data?, error? } | { kind: 'fatal', message }
  */
@@ -11,12 +12,14 @@ import { fetchAssets, loadMujoco } from './mujocoLoader'
 import { SessionCore } from './session'
 import { IdbSkillStorage } from './skillsIdb'
 import { MemorySkillStorage, type SkillStorage } from './skills'
+import type { TaskSpec } from './data'
 
 export type WorkerIn =
   | { op: 'init'; mujocoUrl: string; assetsBase: string }
   | { op: 'cmd'; msg: Record<string, unknown> }
   | { op: 'stop' }
   | { op: 'scene'; id: number; name: string; seed: number; robot: string }
+  | { op: 'imitate_scene'; id: number; task: TaskSpec; robot: string }
 
 export type WorkerOut =
   | { kind: 'ready'; camera: boolean }
@@ -81,6 +84,16 @@ ctx.onmessage = (e: MessageEvent<WorkerIn>) => {
       break
     case 'cmd':
       void session?.submit(m.msg)
+      break
+    case 'imitate_scene':
+      if (!session) {
+        post({ kind: 'reply', id: m.id, ok: false, error: 'The browser engine is not ready.' })
+        break
+      }
+      session.imitationScene(m.task, m.robot).then(
+        (data) => post({ kind: 'reply', id: m.id, ok: true, data }),
+        (err: unknown) => post({ kind: 'reply', id: m.id, ok: false, error: err instanceof Error ? err.message : String(err) }),
+      )
       break
     case 'scene':
       if (!session) {

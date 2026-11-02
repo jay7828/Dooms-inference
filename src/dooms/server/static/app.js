@@ -204,6 +204,7 @@ $("#btn-aws").onclick = openAws;
 const SCENE_INFO = {
   sandbox: ["Sandbox"], sandbox_fallen: ["Knocked-over bottle"], sandbox_blocked: ["Box beside the bottle"],
   put_bottle_in_box: ["Bottle → box"], put_cube_in_box: ["Cube → box"], stack_cubes: ["Stack cubes"],
+  lab_pour_liquid: ["Lab · pour blue liquid"], lab_test_tube: ["Lab · test tube → rack"],
 };
 function renderRobots() {
   $("#seg-robot").innerHTML = (S.cfg.robots || []).map((r) => `<button data-value="${esc(r.id)}" title="${esc(r.label)} (${r.dof} joints)">${esc(r.id === "so101" ? "SO101" : r.label.split(" ")[0])}</button>`).join("");
@@ -307,6 +308,7 @@ function ctrlText(c, sid) {
   else if (c.type === "AxisAlign" || c.type === "YawAlign") a = [esc(c.source), esc(c.target), c.param ? num(c.param) : ""];
   else if (c.type === "Force") a = ["axis=" + esc(c.axis), c.param ? num(c.param) : ""];
   else if (c.type === "Gripper") a = [esc(c.action), c.param ? num(c.param) : ""];
+  else if (c.type === "Wait") a = [c.param ? num(c.param) : ""];
   return `<span class="p">[p${c.priority}${c.stage ? " · stage " + c.stage : ""}]</span> ${c.type}(${a.filter(Boolean).join(", ")})`;
 }
 function skillTag(id) {

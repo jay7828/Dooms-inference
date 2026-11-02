@@ -13,6 +13,7 @@ export interface MjModel {
   opt: { timestep: number }
   body_pos: Float64Array
   jnt_qposadr: Int32Array
+  body_jntadr: Int32Array
   jnt_dofadr: Int32Array
   jnt_range: Float64Array
   sensor_adr: Int32Array

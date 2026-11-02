@@ -93,7 +93,7 @@ export class TaskDecomposer extends Agent<Decomposition> {
   }
 }
 
-const LIMITS: Record<string, [number, number]> = { m: [-1.0, 1.0], deg: [-360.0, 360.0], N: [0.5, 30.0] }
+const LIMITS: Record<string, [number, number]> = { m: [-1.0, 1.0], deg: [-360.0, 360.0], N: [0.5, 30.0], s: [0.0, 5.0] }
 
 export class ParameterSetter extends Agent<ParameterGroundings> {
   readonly name = 'parameter_setter' as const
@@ -135,7 +135,7 @@ export class ParameterSetter extends Agent<ParameterGroundings> {
 }
 
 const EEF_VECTORS = new Set(['eef_x', 'eef_y', 'eef_z', 'eef_x_axis', 'eef_y_axis', 'eef_z_axis', 'world_x', 'world_y', 'world_z'])
-const UNIT: Record<string, ParamSpec['unit']> = { PosAlign: 'm', AxisAlign: 'deg', YawAlign: 'deg', Force: 'N', Gripper: 'm' }
+const UNIT: Record<string, ParamSpec['unit']> = { PosAlign: 'm', AxisAlign: 'deg', YawAlign: 'deg', Force: 'N', Gripper: 'm', Wait: 's' }
 const KP_NAME_RE = /^[a-z][a-z0-9_]{1,40}$/
 
 export interface SkillInfo {
@@ -244,15 +244,15 @@ export class SkillGenerator extends Agent<SkillPlan> {
         if (c.type === 'Force' && !['x', 'y', 'z'].includes((c.axis || '').replace(/^[-+]+/, ''))) throw new ValueError(`subtask ${sid}: Force axis must be one of x,y,z,-x,-y,-z`)
         if (c.type === 'Gripper' && c.action === null) throw new ValueError(`subtask ${sid}: Gripper needs action open|close|width`)
         if (c.type === 'Gripper' && c.action === 'width' && !c.param) throw new ValueError(`subtask ${sid}: Gripper width needs a param`)
-        if (['PosAlign', 'AxisAlign', 'YawAlign', 'Force'].includes(c.type) && !c.param) throw new ValueError(`subtask ${sid}: ${c.type} needs a symbolic param`)
+        if (['PosAlign', 'AxisAlign', 'YawAlign', 'Force', 'Wait'].includes(c.type) && !c.param) throw new ValueError(`subtask ${sid}: ${c.type} needs a symbolic param`)
         for (const n of [c.source, c.target]) {
           for (const k of keypointsIn(n))
             if (!(k in vocab) && !defined.has(k))
               throw new ValueError(
                 `subtask ${sid}: unknown keypoint '${k}'. Use one of ${JSON.stringify(Object.keys(vocab).sort())} (plus eef_tcp, eef_z), or DEFINE a new one: add {"name": "...", "description": "..."} to the \`keypoints\` list of one of your choices (a definition anywhere in the plan counts for all subtasks; it works for reused skills too) with a precise description of what to point at, e.g. 'an empty spot on the table to the right of the box'.`,
               )
-          if (c.type === 'YawAlign' && n !== 'eef_y' && n !== 'eef_y_axis' && !(n ?? '').endsWith('_axis') && !(n ?? '').includes('__to__'))
-            throw new ValueError(`subtask ${sid}: YawAlign source must be eef_y and target <keypoint>_axis`)
+          if (c.type === 'YawAlign' && n !== 'eef_y' && n !== 'eef_y_axis' && n !== 'world_x' && n !== 'world_y' && !(n ?? '').endsWith('_axis') && !(n ?? '').includes('__to__'))
+            throw new ValueError(`subtask ${sid}: YawAlign source must be eef_y and target <keypoint>_axis, <A>__to__<B>, world_x or world_y`)
           if (c.type === 'AxisAlign' && !EEF_VECTORS.has(n ?? '') && !/(_normal|_norm)$/.test(n ?? '') && !(n ?? '').includes('__to__'))
             throw new ValueError(`subtask ${sid}: AxisAlign vectors must be eef_z or <keypoint>_normal`)
         }

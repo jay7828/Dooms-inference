@@ -1,7 +1,8 @@
 /** Episode monitor (monitor.py) and the ground-truth success predicates (bench/success_checks.py). */
-import type { SuccessPredicate, TaskSpec } from './data'
+import { LAB, type SuccessPredicate, type TaskSpec } from './data'
 import type { MuJoCoEnv } from './env'
 import { norm, type Vec3 } from './linalg'
+import { tubeHalf } from './sceneBuilder'
 import { Gripper } from './controllers'
 import type { SubtaskResult, SubtaskScript } from './execution'
 
@@ -58,11 +59,35 @@ function outside(env: MuJoCoEnv, obj: string, box: string, start?: Record<string
   return (Math.abs(o[0] - b[0]) > clear || Math.abs(o[1] - b[1]) > clear) && o[2] < 0.1 && calm(env, obj)
 }
 
+/** Share of `src`'s liquid drops that sit inside beaker `dst` at the end. */
+export function pouredFraction(env: MuJoCoEnv, src: string, dst: string): number {
+  const drops = env.dropPositions(src)
+  if (!drops.length) return 0
+  const spec = env.task.objects.find((o) => o.name === dst)
+  const b = env.objectPos(dst)
+  const inner = (spec?.radius ?? LAB.big_r) - LAB.wall + 0.003 // + the corners of the polygonal wall
+  const top = b[2] + (spec?.height ?? LAB.big_h) + 0.01
+  return drops.filter((p) => Math.hypot(p[0] - b[0], p[1] - b[1]) < inner && p[2] > b[2] && p[2] < top).length / drops.length
+}
+
+const POURED_MIN = 0.6 // at least 60 % of the liquid must end up in the target beaker
+
+/** The tube stands in the rack hole `slot` (a keypoint site): centred in the hole, lowered in, upright and still. */
+function inSlot(env: MuJoCoEnv, tube: string, slot: string): boolean {
+  const t = env.objectPos(tube)
+  const [s] = env.gtKeypoint(slot)
+  const bottom = t[2] - tubeHalf() - LAB.tube_r
+  return Math.hypot(t[0] - s[0], t[1] - s[1]) < LAB.hole / 2 && bottom < s[2] - 0.03 && env.bodyAxisZ(tube)[2] > 0.95 && calm(env, tube)
+}
+
 export function evaluate(env: MuJoCoEnv, task: TaskSpec, start?: Record<string, Vec3>): { success: boolean | null; predicates: Record<string, boolean> } {
   const results: Record<string, boolean> = {}
   for (const p of task.success as SuccessPredicate[]) {
-    results[`${p.type}(${p.object},${p.target})`] =
-      p.type === 'outside' ? outside(env, p.object, p.target, start) : p.type === 'inside' ? inside(env, p.object, p.target) : onTop(env, p.object, p.target)
+    const check: Record<SuccessPredicate['type'], () => boolean> = {
+      outside: () => outside(env, p.object, p.target, start), inside: () => inside(env, p.object, p.target), on_top: () => onTop(env, p.object, p.target),
+      poured: () => pouredFraction(env, p.object, p.target) >= POURED_MIN, in_slot: () => inSlot(env, p.object, p.target),
+    }
+    results[`${p.type}(${p.object},${p.target})`] = check[p.type]()
   }
   const vals = Object.values(results)
   return { success: vals.length ? vals.every(Boolean) : null, predicates: results }

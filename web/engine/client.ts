@@ -4,6 +4,7 @@
  * agent-camera frames through callbacks; plus the local equivalents of the /api/scene and /api/skills endpoints.
  */
 import type { SceneData, StoredSkill } from '../types'
+import type { TaskSpec } from './data'
 import type { WorkerIn, WorkerOut } from './engine.worker'
 import { SkillLibrary } from './skills'
 import { IdbSkillStorage } from './skillsIdb'
@@ -88,6 +89,18 @@ export class LocalSession {
       const id = this.nextId++
       this.pending.set(id, { resolve, reject })
       const post: WorkerIn = { op: 'scene', id, name, seed, robot }
+      worker.postMessage(post)
+    })
+  }
+
+  /** Build a scene rebuilt from a video (see web/imitate) and return it for the 3D viewer. */
+  imitationScene(task: TaskSpec, robot: string): Promise<SceneData> {
+    const worker = this.worker
+    if (!worker) return Promise.reject(new Error('The browser engine is not running.'))
+    return new Promise((resolve, reject) => {
+      const id = this.nextId++
+      this.pending.set(id, { resolve, reject })
+      const post: WorkerIn = { op: 'imitate_scene', id, task, robot }
       worker.postMessage(post)
     })
   }
