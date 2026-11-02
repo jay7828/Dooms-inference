@@ -136,6 +136,36 @@ agent pipeline, the skill library and an activity log with cost and token counts
   change the scene or change the seed. Stop aborts the running command and leaves the world as it is.
 * The 3D viewer loads three.js from a CDN, so the browser needs internet access.
 
+### Video to robot (`/static/imitate.html`)
+
+Upload a video of a hand doing a task on a table; the page rebuilds the scene and a Franka repeats the motion in
+MuJoCo. Everything runs in the browser: MediaPipe (from its CDN) tracks the hand and finds objects, the engine worker
+simulates.
+
+* **3D**: plain video runs a depth model in the browser (Depth Anything V2 small, from Hugging Face). Its relative
+  depth is made metric with the hand (known size) and the table (flat): the offset is the one that makes the table a
+  plane, the scale comes from the hand. Depth then also corrects the hand's distance frame by frame. A still camera
+  gets a clean plate first (per-pixel median over frames, hands removed), so depth, objects and the photo surface
+  come from the scene without hands. A depth video (grey levels, near/far in metres) is used instead when given.
+* **Scene**: the table plane, objects = regions standing on it (size, orientation, colour from the depth; the object
+  detector only names them), and a photo-textured surface of the view in the 3D viewer (toggle: photo button).
+* **Length / start**: up to 60 s from where the video is paused (Options > Length).
+* **Ask Claude to check the scene**: Claude (your Claude API key or Bedrock credentials, entered on the page, same
+  storage as the Studio) sees the clean frame with a pixel grid, three action frames and the rebuild rendered from the
+  video camera, judges it and lists the real objects (shape, size in cm, colour, footprint in the image). If the
+  rebuild is wrong, those objects are placed on the measured table, the scene is rebuilt and the robot runs at once.
+  Switch back and forth with Scene: Claude | Depth. Flat things the hand handles (cloth, paper) are drawn on the table
+  but not simulated as rigid bodies.
+* **Robot placement**: the base goes where the person was, within reach of the whole path. Without the depth model,
+  an object the hand closes on that nothing detected is added at the grasp.
+* **Retargeting**: the TCP follows the point between thumb and index tips; their gap sets the gripper opening. Grasps
+  are centred on the object (Assist). The arm tracks with the same prioritised IK as the controllers, physics on.
+* **Speed** slows the robot's motion (default ½×); the video plays at the same rate.
+* Code: `web/imitate/` (analysis, geometry, page) and `web/engine/imitation.ts` (the follower). Headless check:
+  `node web/build_selftest.mjs && node runs/selftest/imitate_selftest.mjs [--depth]`. Next steps (a dexterous
+  hand): [docs/VIDEO_IMITATION.md](docs/VIDEO_IMITATION.md).
+* The video must play in the browser (H.264 MP4; MPEG-4 Part 2 does not play in Chrome).
+
 ## Skills, obstacles, fallen objects
 
 * **Skill library** (`skills/library/*.json` in Python, IndexedDB in the browser): a skill is a reusable recipe with

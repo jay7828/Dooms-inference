@@ -5,9 +5,10 @@
  */
 import { OracleGrounder, type Grounder } from './agents'
 import { taskForCommand } from './command'
-import { DEFAULT_CONFIG, DEFAULT_ROBOT, TASKS, deepUpdate, getProfile, loadTask, profileSupports, type Config } from './data'
+import { DEFAULT_CONFIG, DEFAULT_ROBOT, TASKS, deepUpdate, getProfile, loadTask, profileSupports, type Config, type TaskSpec } from './data'
 import { MuJoCoEnv, type CameraParams } from './env'
 import { Aborted } from './execution'
+import { runImitation, type ImitationTrajectory } from './imitation'
 import type { ImageCodec } from './imageOps'
 import { NO_PRICING, type LLM } from './llm'
 import type { MujocoApi } from './mujocoApi'
@@ -109,6 +110,11 @@ export class SessionCore {
   private frameBusy = false
   private lastFrameAt = 0
   private renderMs = 0
+  /** camera streamed while a command runs ('scene', or 'video' for an imitation run) and the frame size */
+  private streamCam = 'scene'
+  private streamSize: [number, number] = [480, 360]
+  /** the scene rebuilt from a video, when that is the loaded scene */
+  private videoTask: TaskSpec | null = null
 
   constructor(private deps: SessionDeps) {}
 
@@ -139,13 +145,14 @@ export class SessionCore {
   private async ensureEnv(scene: string, seed: number, forceReset: boolean, robot: string): Promise<MuJoCoEnv> {
     const profile = getProfile(robot)
     if (!profileSupports(profile, scene)) throw new Error(`the ${profile.label} does not support the '${scene}' scene`)
-    const fresh = !this.env || this.scene !== scene || this.robot !== robot
+    const fresh = !this.env || this.scene !== scene || this.robot !== robot || this.videoTask !== null
     if (fresh) {
       this.env?.close()
       this.env = null
       this.env = await MuJoCoEnv.create(this.deps.mj, this.deps.assets, loadTask(scene), this.baseCfg, profile)
       this.scene = scene
       this.robot = robot
+      this.videoTask = null
       this.deps.renderer?.setScene({ ...exportScene(this.env.model, this.env.data), robot: robot } as SceneData)
       this.env.imageProvider = async (camera) => this.renderImage(camera, 'image/png')
     }
@@ -166,10 +173,10 @@ export class SessionCore {
     return r.render(obs.camera, { width: size?.[0] ?? obs.camera.width, height: size?.[1] ?? obs.camera.height, mime, quality })
   }
 
-  private async pushState(env: MuJoCoEnv): Promise<void> {
+  private async pushState(env: MuJoCoEnv, camera = 'scene'): Promise<void> {
     const snap = env.poseSnapshot()
     this.deps.host.pose(snap.t, snap.poses)
-    const jpg = await this.renderImage('scene', 'image/jpeg', 0.75, [480, 360])
+    const jpg = await this.renderImage(camera, 'image/jpeg', 0.75, camera === 'scene' ? [480, 360] : this.streamSize)
     if (jpg) this.deps.host.frame(jpg)
   }
 
@@ -186,6 +193,25 @@ export class SessionCore {
     })
   }
 
+  /** Build a scene rebuilt from a video (objects, table and the video's camera as `video_cam`) and return it for the viewer. */
+  imitationScene(task: TaskSpec, robot: string): Promise<SceneData> {
+    return this.enqueue(async () => {
+      const profile = getProfile(robot)
+      this.env?.close()
+      this.env = null
+      this.env = await MuJoCoEnv.create(this.deps.mj, this.deps.assets, task, this.baseCfg, profile)
+      this.scene = VIDEO_SCENE
+      this.robot = robot
+      this.videoTask = structuredClone(task)
+      this.deps.renderer?.setScene({ ...exportScene(this.env.model, this.env.data), robot } as SceneData)
+      this.env.imageProvider = async (camera) => this.renderImage(camera, 'image/png')
+      this.env.reset(0)
+      this.seed = 0
+      this.runs = 0
+      return { ...exportScene(this.env.model, this.env.data), view: profile.view, robot } as SceneData
+    })
+  }
+
   // ---------------------------------------------------------------- protocol
   private async handle(msg: Record<string, unknown>): Promise<void> {
     const kind = msg.type
@@ -196,6 +222,14 @@ export class SessionCore {
         await this.pushState(env)
         this.sceneState()
       } else if (kind === 'run') await this.run(msg)
+      else if (kind === 'imitate_run') await this.imitate(msg)
+      else if (kind === 'imitate_reset') {
+        if (this.env && this.videoTask) {
+          if (Array.isArray(msg.frame)) this.streamSize = msg.frame as [number, number]
+          this.env.reset(0)
+          await this.pushState(this.env, 'video')
+        }
+      }
     } catch (e) {
       if (e instanceof Aborted) {
         this.put({ type: 'stopped' })
@@ -205,7 +239,7 @@ export class SessionCore {
         this.put({ type: 'error', message: name === 'BedrockError' ? (e as Error).message : `${name}: ${e instanceof Error ? e.message : String(e)}`, trace: e instanceof Error ? (e.stack ?? '').slice(-1500) : '' })
       }
     } finally {
-      if (kind === 'run') this.put({ type: 'ended' })
+      if (kind === 'run' || kind === 'imitate_run') this.put({ type: 'ended' })
     }
   }
 
@@ -244,34 +278,7 @@ export class SessionCore {
       await library.reload()
     }
 
-    const speed = Number(msg.speed ?? 1)
-    const realtime = this.deps.realtime !== false
-    const clock = { t: env.data.time, wall: performance.now(), yielded: performance.now() }
-    env.pace = async () => {
-      if (this.cancelled) throw new Aborted()
-      const t = env.data.time
-      let now = performance.now()
-      if (realtime && speed > 0) {
-        // pace the simulation to wall-clock time
-        const due = clock.wall + ((t - clock.t) / speed) * 1000
-        if (due > now) {
-          await wait(due - now)
-          now = performance.now()
-          clock.yielded = now
-          if (this.cancelled) throw new Aborted()
-        }
-        clock.wall = now
-      }
-      clock.t = t
-      if (now - clock.yielded > 20) {
-        await wait(0) // let a Stop message (and camera-frame encoding) through
-        clock.yielded = performance.now()
-        if (this.cancelled) throw new Aborted()
-      }
-    }
-    env.poseSink = (t, P) => this.deps.host.pose(t, P)
-    env.frameEvery = 5
-    env.frameSink = () => void this.streamFrame()
+    const clock = this.attach(env, Number(msg.speed ?? 1))
 
     const emit = (ev: Record<string, unknown>): void => {
       if (ev.type === 'agent' || ev.type === 'agent_start' || ev.type === 'agent_rejected') {
@@ -313,15 +320,78 @@ export class SessionCore {
       })
       res = await pipeline.run(this.seed, false)
     } finally {
-      env.poseSink = null
-      env.frameSink = null
-      env.pace = null
+      this.detach(env)
     }
     this.runs++
     const d = { ...res, subtask_log: res.subtask_log.map((l) => Object.fromEntries(Object.entries(l).filter(([k]) => k !== 'script'))) } as EpisodeResult & { grounding_err_mm_mean: number | null }
     d.grounding_err_mm_mean = res.grounding_err_mm.length ? res.grounding_err_mm.reduce((a, b) => a + b, 0) / res.grounding_err_mm.length : null
     this.put({ type: 'done', result: d })
     this.sceneState()
+  }
+
+  /** Pace `env` to wall-clock time at `speed` (0 = as fast as possible), honour Stop, stream poses and camera frames. */
+  private attach(env: MuJoCoEnv, speed: number): { t: number; wall: number; yielded: number } {
+    const realtime = this.deps.realtime !== false
+    const clock = { t: env.data.time, wall: performance.now(), yielded: performance.now() }
+    env.pace = async () => {
+      if (this.cancelled) throw new Aborted()
+      const t = env.data.time
+      let now = performance.now()
+      if (realtime && speed > 0) {
+        // pace the simulation to wall-clock time
+        const due = clock.wall + ((t - clock.t) / speed) * 1000
+        if (due > now) {
+          await wait(due - now)
+          now = performance.now()
+          clock.yielded = now
+          if (this.cancelled) throw new Aborted()
+        }
+        clock.wall = now
+      }
+      clock.t = t
+      if (now - clock.yielded > 20) {
+        await wait(0) // let a Stop message (and camera-frame encoding) through
+        clock.yielded = performance.now()
+        if (this.cancelled) throw new Aborted()
+      }
+    }
+    env.poseSink = (t, P) => this.deps.host.pose(t, P)
+    env.frameEvery = 5
+    env.frameSink = () => void this.streamFrame()
+    return clock
+  }
+
+
+  private detach(env: MuJoCoEnv): void {
+    env.poseSink = null
+    env.frameSink = null
+    env.pace = null
+  }
+
+  /** Follow a trajectory retargeted from a video in the video scene (built by imitationScene). */
+  private async imitate(msg: Record<string, unknown>): Promise<void> {
+    const env = this.env
+    if (!env || !this.videoTask) throw new Error('load a video scene first')
+    const traj = msg.trajectory as ImitationTrajectory
+    const size = msg.frame as [number, number] | undefined
+    if (msg.reset !== false) env.reset(0)
+    this.streamCam = 'video'
+    if (size) this.streamSize = size
+    this.attach(env, Number(msg.speed ?? 1))
+    env.frameEvery = 2
+    this.put({ type: 'imitate_started', samples: traj.pos.length, dt: traj.dt })
+    try {
+      const res = await runImitation(env, traj, (msg.options ?? {}) as Record<string, number>, {
+        onStart: () => this.put({ type: 'imitate_clock', t: 0 }),
+        onProgress: (t, err) => this.put({ type: 'imitate_progress', t, err }),
+      })
+      await this.pushState(env, 'video')
+      this.runs++
+      this.put({ type: 'imitate_done', result: res })
+    } finally {
+      this.detach(env)
+      this.streamCam = 'scene'
+    }
   }
 
   /** Render the agents' camera and send it without stalling the simulation (one frame in flight at a time). */
@@ -334,7 +404,7 @@ export class SessionCore {
     this.frameBusy = true
     try {
       const t0 = performance.now()
-      const jpg = await this.renderImage('scene', 'image/jpeg', 0.75, [480, 360])
+      const jpg = await this.renderImage(this.streamCam, 'image/jpeg', 0.75, this.streamCam === 'scene' ? [480, 360] : this.streamSize)
       this.renderMs = performance.now() - t0
       if (jpg) this.deps.host.frame(jpg)
     } finally {
@@ -353,6 +423,9 @@ export class SessionCore {
     this.env = null
   }
 }
+
+/** Name of the scene rebuilt from a video. */
+export const VIDEO_SCENE = '__video__'
 
 export function toBase64(u8: Uint8Array): string {
   let s = ''

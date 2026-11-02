@@ -233,6 +233,7 @@ export class MuJoCoEnv {
     const placed: [number, number][] = []
     const at: Record<string, [number, number, number]> = {} // x, y, yaw of every placed object
     for (const o of this.task.objects) {
+      if (o.decal) continue // fixed in the model where it lies
       const adr = m.jnt_qposadr[mj.mj_name2id(m, mj.mjtObj.mjOBJ_JOINT.value, `${o.name}_free`)]!
       const holder = o.in ? this.task.objects.find((h) => h.name === o.in) : undefined
       if (holder && at[holder.name]) {
@@ -383,7 +384,7 @@ export class MuJoCoEnv {
   }
 
   render(camera = 'scene'): Observation {
-    const cc = this.cfg.sim.cameras[camera as 'scene' | 'wrist']
+    const cc = this.cfg.sim.cameras[camera as 'scene' | 'wrist'] ?? { width: 640, height: 480 } // extra task cameras: the caller picks the size
     const name = `${camera}_cam`
     const cid = this.id('mjOBJ_CAMERA', name)
     if (cid < 0) throw new Error(`no camera '${name}'`)

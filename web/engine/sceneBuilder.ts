@@ -60,6 +60,27 @@ function cubeXml(o: ObjectSpec): string {
 </body>`
 }
 
+/** Generic solid objects rebuilt from a video (block / cylinder / sphere). Site `<name>_top` = centre of the top. */
+function solidXml(o: ObjectSpec): string {
+  const [a, b, c] = o.dims ?? [o.size / 2, o.size / 2, o.size / 2]
+  const type = o.type === 'block' ? 'box' : o.type
+  const size = o.type === 'block' ? `${n(a)} ${n(b)} ${n(c)}` : o.type === 'cylinder' ? `${n(a)} ${n(b)} 0` : n(a)
+  const halfH = o.type === 'block' ? c : o.type === 'cylinder' ? b : a
+  const vol = o.type === 'block' ? 8 * a * b * c : o.type === 'cylinder' ? 2 * Math.PI * a * a * b : (4 / 3) * Math.PI * a ** 3
+  const mass = o.mass ?? Math.min(Math.max(vol * 400, 0.02), 0.6)
+  if (o.decal) {
+    const yaw = o.yaw_range[0]
+    return `<body name="${o.name}" pos="${n(o.x_range[0])} ${n(o.y_range[0])} ${n(halfH + 0.0005)}" quat="${zq(yaw)}">
+  <geom name="${o.name}_geom" type="${type}" size="${size}" rgba="${rgba(o.color)}" ${VIS}/>
+</body>`
+  }
+  return `<body name="${o.name}" pos="0.5 0 ${n(halfH + 0.002)}">
+  <freejoint name="${o.name}_free"/>
+  <geom name="${o.name}_geom" type="${type}" size="${size}" rgba="${rgba(o.color)}" mass="${n(mass)}" friction="1.5 0.01 0.001" condim="4"/>
+  <site name="${o.name}_top" pos="0 0 ${n(halfH)}" size="0.003 0 0" group="4"/>
+</body>`
+}
+
 // ------------------------------------------------------------------------------------------------ lab glassware
 
 const VIS = 'contype="0" conaffinity="0" group="1"' // decoration only: rendered, never collides, invisible to the height map
@@ -249,18 +270,20 @@ export function buildModelXml(baseXml: string, task: TaskSpec, cfg: Config, prof
   if (so) xml = xml.replace(/timestep="[^"]*"/, `timestep="${dt}"`)
   else xml = xml.replace('<option integrator="implicitfast"/>', `<option integrator="implicitfast" timestep="${dt}"/>`)
 
-  const [tcx, tcy] = profile.table_center
-  const [thx, thy] = profile.table_half
+  const [tcx, tcy] = task.table?.center ?? profile.table_center
+  const [thx, thy] = task.table?.half ?? profile.table_half
+  const tableQuat = task.table?.yaw ? ` quat="${zq(task.table.yaw)}"` : ''
   const lab = task.environment === 'lab'
+  const tableRgba = task.table?.rgba ? rgba(task.table.rgba, task.table.rgba[3]) : lab ? '0.9 0.91 0.92 1' : '0.62 0.62 0.6 1'
   const world: string[] = [
     `<light pos="${n(tcx)} 0 2" dir="0 0 -1" diffuse="0.4 0.4 0.4" castshadow="false"/>`,
     `<geom name="floor" type="plane" size="3 3 0.05" pos="0 0 -0.04" rgba="${lab ? '0.55 0.58 0.6 1' : '0.12 0.13 0.15 1'}" ${LIQUID_SOLID}/>`,
-    `<geom name="table" type="box" size="${n(thx)} ${n(thy)} 0.02" pos="${n(tcx)} ${n(tcy)} -0.02" rgba="${lab ? '0.9 0.91 0.92 1' : '0.62 0.62 0.6 1'}" friction="0.5 0.005 0.0001" ${LIQUID_SOLID}/>`,
+    `<geom name="table" type="box" size="${n(thx)} ${n(thy)} 0.02" pos="${n(tcx)} ${n(tcy)} -0.02"${tableQuat} rgba="${tableRgba}" friction="0.5 0.005 0.0001" ${LIQUID_SOLID}/>`,
   ]
   if (lab) world.push(labDecorXml())
   const build: Record<ObjectSpec['type'], (o: ObjectSpec) => string> = {
     bottle: (o) => bottleXml(o, profile.dims), tray: (o) => trayXml(o, profile.dims), cube: cubeXml,
-    beaker: beakerXml, tube: tubeXml, rack: rackXml,
+    beaker: beakerXml, tube: tubeXml, rack: rackXml, block: solidXml, cylinder: solidXml, sphere: solidXml,
   }
   for (const o of task.objects) world.push(build[o.type](o))
   // Drops go last: the constraint solver factorises from the last degree of freedom back, so a beaker declared AFTER
@@ -268,6 +291,7 @@ export function buildModelXml(baseXml: string, task: TaskSpec, cfg: Config, prof
   for (const o of task.objects) if (o.type === 'beaker' && o.liquid) world.push(dropsXml(o))
   const sc = { ...cfg.sim.cameras.scene, ...profile.scene_cam }
   world.push(`<camera name="scene_cam" pos="${arr(sc.pos)}" quat="${arr(lookatQuat(sc.pos, sc.lookat))}" fovy="${n(sc.fovy)}"/>`)
+  for (const c of task.cameras ?? []) world.push(`<camera name="${c.name}_cam" pos="${arr(c.pos)}" quat="${arr(c.quat)}" fovy="${n(c.fovy)}"/>`)
 
   let handTag: RegExp
   let handInner: string

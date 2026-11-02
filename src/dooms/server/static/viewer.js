@@ -18,8 +18,8 @@ export function createViewer(canvas, stage) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   const scene = new THREE.Scene();
-  const world = new THREE.Group(), markers = new THREE.Group();
-  scene.add(world, markers);
+  const world = new THREE.Group(), markers = new THREE.Group(), paths = new THREE.Group();
+  scene.add(world, markers, paths);
 
   const camera = new THREE.PerspectiveCamera(42, 1.4, 0.03, 30);
   camera.up.set(0, 0, 1); // MuJoCo world: z up
@@ -150,6 +150,33 @@ export function createViewer(canvas, stage) {
     }
   };
   api.clearMarkers = clearMarkers;
+  // a polyline through world points (e.g. the path of a hand from a video); [] clears it
+  api.showPath = (points, color = 0x6f8cff) => {
+    while (paths.children.length) { const c = paths.children[0]; paths.remove(c); c.geometry?.dispose(); c.material?.dispose(); }
+    if (!points?.length) return;
+    const geo = new THREE.BufferGeometry().setFromPoints(points.map((p) => new THREE.Vector3(p[0], p[1], p[2])));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85, depthTest: false }));
+    line.renderOrder = 9;
+    paths.add(line);
+  };
+  api.setPathVisible = (on) => { paths.visible = on; };
+  // photo-textured surface of a video's view (robot frame); null removes it
+  const backdrop = new THREE.Group();
+  scene.add(backdrop);
+  api.setBackdrop = (b) => {
+    while (backdrop.children.length) { const c = backdrop.children[0]; backdrop.remove(c); c.geometry?.dispose(); c.material?.map?.dispose(); c.material?.dispose(); }
+    if (!b?.index?.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(b.positions, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(b.uvs, 2));
+    geo.setIndex(b.index);
+    const tex = new THREE.TextureLoader().load(b.image);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    // drawn over the simulator's table top (same height): polygon offset instead of z-fighting
+    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    backdrop.add(new THREE.Mesh(geo, mat));
+  };
+  api.setBackdropVisible = (on) => { backdrop.visible = on; };
   api.resetView = resetView;
   api.setDefaultView = (v) => { if (v?.pos && v?.target) { DEFAULT_VIEW = v; resetView(); } else { DEFAULT_VIEW = { pos: [1.62, -1.15, 1.2], target: [0.42, 0.02, 0.1] }; resetView(); } };   // per-robot camera
   return api;

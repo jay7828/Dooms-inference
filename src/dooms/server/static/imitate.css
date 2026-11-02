@@ -1,0 +1,49 @@
+/* Video -> robot page: additions to app.css */
+
+.layout.imitate { grid-template-columns: 280px minmax(0, 1fr) minmax(300px, 400px); }
+.layout.imitate > .col:last-child { gap: 10px; }
+
+.drop { display: grid; justify-items: center; gap: 4px; padding: 18px 10px; border: 1px dashed var(--border-2); border-radius: var(--r); background: var(--bg); cursor: pointer; text-align: center; transition: border-color .12s, background .12s; }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop svg.i { width: 20px; height: 20px; color: var(--accent-h); }
+.drop b { font-weight: 600; font-size: 12.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop.loaded { padding: 10px; }
+details.acc { margin-top: 10px; }
+details.acc .acc-b .prow:first-child { margin-top: 0; }
+details.acc .prow { grid-template-columns: 56px auto 1fr; } details.acc .prow > .seg { grid-column: auto; } details.acc .prow .num { width: 64px; }
+
+.progress { position: relative; height: 22px; margin-top: 8px; border-radius: var(--r-sm); background: var(--bg); border: 1px solid var(--border); overflow: hidden; }
+.progress i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent-soft); transition: width .15s; }
+.progress span { position: relative; display: block; line-height: 20px; padding: 0 8px; font-size: 11.5px; color: var(--text-2); }
+
+.checks { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 5px; }
+.checks li { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); }
+.checks li svg.i { color: var(--ok); } .checks li.warn svg.i { color: var(--warn); }
+.checks li b { color: var(--text); font-weight: 500; }
+.checks .swap { height: auto; font-size: 11px; color: var(--accent-h); } .checks li .v { margin-left: auto; font: 11.5px var(--mono); color: var(--muted); }
+.sect { margin: 14px 0 6px; font-size: 11px; font-weight: 500; color: var(--muted); display: flex; gap: 6px; }
+.sect .count { font: 600 10px var(--mono); }
+.obj { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg); margin-bottom: 4px; font-size: 12px; }
+.obj .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; border: 1px solid rgba(255,255,255,.15); }
+.obj .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.obj .sz { margin-left: auto; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.obj .tag { font-size: 10.5px; color: var(--accent-h); }
+.obj .btn { flex: none; }
+.empty-note { font-size: 11.5px; color: var(--muted); }
+
+.media { display: flex; flex-direction: column; min-height: 0; }
+.vwrap { position: relative; background: #000; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 0 0 var(--r) var(--r); }
+.vwrap video, .vwrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.vwrap img:not([src]) { visibility: hidden; }
+.vwrap #blend-img { opacity: .55; pointer-events: none; }
+.vwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.vwrap .loading { background: transparent; }
+
+.result .metrics { margin: 6px 0 0; }
+
+@media (max-width: 1200px) { .layout.imitate { grid-template-columns: 280px minmax(0, 1fr); } .layout.imitate > .col:last-child { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; } }
+@media (max-width: 800px) { .layout.imitate { grid-template-columns: 1fr; } .layout.imitate > .col:last-child { grid-template-columns: 1fr; } .nav a { padding: 0 6px; } }
+.claude { margin-top: 12px; }
+.verdict { margin-top: 8px; padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--border-2); background: var(--surface-2); font-size: 12px; color: var(--text-2); }
+.verdict b { color: var(--text); font-weight: 600; } .verdict.ok { border-color: rgba(63,182,139,.35); } .verdict.bad { border-color: rgba(217,154,53,.45); }
+.verdict ul { margin: 6px 0 0; padding-left: 16px; } .verdict li { margin: 2px 0; } .verdict .task { margin-top: 4px; color: var(--text-2); }

@@ -167,7 +167,7 @@ export const profileSummary = (p: RobotProfile) => ({
 
 export interface ObjectSpec {
   name: string
-  type: 'bottle' | 'tray' | 'cube' | 'beaker' | 'tube' | 'rack'
+  type: 'bottle' | 'tray' | 'cube' | 'beaker' | 'tube' | 'rack' | 'block' | 'cylinder' | 'sphere'
   x_range: Range
   y_range: Range
   yaw_range: Range
@@ -184,6 +184,12 @@ export interface ObjectSpec {
   filled?: number[]
   /** tube: the rack it starts standing in (placed in that rack's first empty slot) */
   in?: string
+  /** block: half sizes (x, y, z); cylinder: (radius, half height, 0); sphere: (radius, 0, 0). Metres. */
+  dims?: [number, number, number]
+  /** mass in kg (block / cylinder / sphere; default from the volume at ~400 kg/m3) */
+  mass?: number
+  /** drawn only, fixed in place, no collisions: cloth or paper lying flat (not simulated as a rigid body) */
+  decal?: boolean
 }
 export interface SuccessPredicate {
   /** poured: most of `object`'s liquid ended up in beaker `target`; in_slot: tube `object` stands in rack slot keypoint `target` */
@@ -202,6 +208,10 @@ export interface TaskSpec {
   seed_variation: boolean
   /** 'lab': a biochemistry bench (white bench top, reagent shelf, glassware) instead of the plain grey table */
   environment?: 'lab'
+  /** table top override (robot frame): centre, half sizes and yaw about z; default: the arm profile's table */
+  table?: { center: [number, number]; half: [number, number]; yaw?: number; rgba?: [number, number, number, number] }
+  /** extra fixed cameras (e.g. the pose of the camera that filmed a video), MuJoCo convention, vertical fov in degrees */
+  cameras?: { name: string; pos: [number, number, number]; quat: [number, number, number, number]; fovy: number }[]
 }
 
 type ObjIn = Partial<ObjectSpec> & Pick<ObjectSpec, 'name' | 'type' | 'x_range' | 'y_range'>

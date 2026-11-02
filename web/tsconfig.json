@@ -1,7 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext", "webworker"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext",
+      "webworker"
+    ],
     "module": "esnext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -10,5 +15,11 @@
     "isolatedModules": true,
     "esModuleInterop": true
   },
-  "include": ["**/*.ts"]
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "imitate/selftest.ts",
+    "imitate/tune.ts"
+  ]
 }
